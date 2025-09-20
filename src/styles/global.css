@@ -1,0 +1,14 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: light;
+  font-family: 'Inter', 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+body {
+  @apply bg-sky-50 text-slate-800 antialiased;
+}
+
+a {
+  @apply transition-colors;
+}

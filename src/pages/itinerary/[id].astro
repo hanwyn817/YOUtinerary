@@ -1,0 +1,14 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ItineraryEditor from '../../components/itinerary/ItineraryEditor.svelte';
+
+export const prerender = false;
+
+const { id } = Astro.params;
+const pageTitle = id === 'new' ? '新建行程 · YOUtinerary' : `编辑行程 · YOUtinerary`;
+---
+<BaseLayout title={pageTitle}>
+  <section class="mx-auto mt-6 max-w-6xl px-4 pb-16 sm:px-6 lg:px-8">
+    <ItineraryEditor client:load itineraryId={id} />
+  </section>
+</BaseLayout>

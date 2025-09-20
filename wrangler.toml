@@ -1,0 +1,24 @@
+name = "youtinerary"
+compatibility_date = "2024-10-01"
+pages_build_output_dir = "./dist"
+compatibility_flags = ["nodejs_compat"]
+
+[vars]
+SESSION_TTL_SECONDS = "28800"
+# GAODE_REST_KEY = "请在部署前填入高德开放平台 Web 服务 key"
+# DEFAULT_PASSWORD = "请部署前设置初始管理密码"
+
+[[kv_namespaces]]
+binding = "ITINERARIES"
+id = "<production-itineraries-kv-id>"
+preview_id = "b019b89e50ce463e9a69ad74194d2b2a"
+
+[[kv_namespaces]]
+binding = "SETTINGS"
+id = "<production-settings-kv-id>"
+preview_id = "9004db92e44a40b592d889011da3070d"
+
+[[kv_namespaces]]
+binding = "SESSION"
+id = "<production-settings-kv-id>"
+preview_id = "9004db92e44a40b592d889011da3070d"

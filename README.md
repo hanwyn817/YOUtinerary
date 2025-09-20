@@ -1,43 +1,77 @@
-# Astro Starter Kit: Minimal
+# YOUtinerary · 那就出发吧！
 
-```sh
-npm create astro@latest -- --template minimal
+个人旅行行程规划工具，面向 10 人以内的小团队/个人使用场景。项目基于 **Astro + Svelte + Tailwind CSS**，后端依托 **Cloudflare Pages Functions + KV** 存储，提供轻量的行程管理、密码保护、费用统计、高德地图路线代理等能力。
+
+## ✨ 主要特性
+
+- 首页总览：以时间轴表格呈现每条安排，可快速跳转到对应行程。
+- 行程工作台：同一天内以时间轴形式混排交通 / 住宿 / 游玩 / 备注，支持插入、拖换顺序、复制与删除。
+- 安全防护：编辑模式需输入密码，密码哈希保存在 `KV:SETTINGS` 中，会话令牌写入安全 Cookie。
+- 导出分享：一键将行程详情渲染为图片（`html2canvas`），输出简洁时间轴，方便收藏与分享。
+- 费用概览：按类别（交通/住宿/游玩/其他）维护预算统计。
+- 高德路线：通过 Cloudflare Functions 代理高德路线规划 API，隐藏真实 API Key。
+- 备份友好：行程数据保存在 KV，可额外导出为 JSON 备份（可在后续补充 UI 按钮）。
+
+## 📦 项目结构
+
 ```
-
-> 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
-
-## 🚀 Project Structure
-
-Inside of your Astro project, you'll see the following folders and files:
-
-```text
-/
-├── public/
+.
 ├── src/
-│   └── pages/
-│       └── index.astro
+│   ├── components/          # Svelte 组件（仪表盘、行程编辑等）
+│   ├── layouts/             # Astro 布局
+│   ├── lib/                 # 前端类型、API 客户端、store 与工具函数
+│   └── pages/               # Astro 页面入口
+├── functions/
+│   └── api/                 # Cloudflare Pages Functions 路由
+├── public/                  # 静态资源
+├── wrangler.toml            # Cloudflare KV & 变量绑定示例
+├── .env.example             # 本地调试所需环境变量示例
 └── package.json
 ```
 
-Astro looks for `.astro` or `.md` files in the `src/pages/` directory. Each page is exposed as a route based on its file name.
+## 🔧 本地开发
 
-There's nothing special about `src/components/`, but that's where we like to put any Astro/React/Vue/Svelte/Preact components.
+```bash
+npm install
+npm run dev          # 仅前端，使用 Astro dev server
+npm run dev:pages    # 先 build，再通过 wrangler pages dev 调起 Functions + 前端
+```
 
-Any static assets, like images, can be placed in the `public/` directory.
+使用 `npm run dev:pages` 前，请确保：
 
-## 🧞 Commands
+1. 安装 Wrangler CLI（已作为 devDependency）。
+2. 本地创建 KV namespace，并将 namespace ID 写入 `wrangler.toml` 或通过 CLI 传参。
+3. 准备 `.env`（可复制 `.env.example`）/ `.dev.vars` 并配置 `DEFAULT_PASSWORD`、`GAODE_REST_KEY` 等变量（Pages Dev 默认读取 `.dev.vars`）。
+4. 运行 Pages Dev 时需绑定三个 KV：`ITINERARIES`、`SETTINGS`、`SESSION`，脚本中已包含 `--kv` 参数。
 
-All commands are run from the root of the project, from a terminal:
+## 🔐 初始化密码
 
-| Command                   | Action                                           |
-| :------------------------ | :----------------------------------------------- |
-| `npm install`             | Installs dependencies                            |
-| `npm run dev`             | Starts local dev server at `localhost:4321`      |
-| `npm run build`           | Build your production site to `./dist/`          |
-| `npm run preview`         | Preview your build locally, before deploying     |
-| `npm run astro ...`       | Run CLI commands like `astro add`, `astro check` |
-| `npm run astro -- --help` | Get help using the Astro CLI                     |
+- 首次启动时，函数会检查 `KV:SETTINGS` 中是否存在管理密码。
+- 若不存在且设置了 `DEFAULT_PASSWORD` 环境变量，会自动写入哈希值。
+- 正式环境建议先通过 `wrangler kv:key put` 手动写入盐 + 哈希，避免在日志中暴露明文密码。
 
-## 👀 Want to learn more?
+## 🌐 高德地图代理
 
-Feel free to check [our documentation](https://docs.astro.build) or jump into our [Discord server](https://astro.build/chat).
+- API 位置：`functions/api/gaode/route.ts`
+- 请求参数：`mode`（driving/transit/walking/bicycling）、`origin`、`destination`。
+- 代理要求：已解锁编辑权限的用户才能调用，防止滥用。
+- 需在 Cloudflare 环境变量中设置 `GAODE_REST_KEY`。
+
+前端可在交通条目中根据地点信息调用该接口，获得路线时长、费用预估等，随后写入交通备注。
+
+## 📄 部署到 Cloudflare Pages
+
+1. 构建：`npm run build`
+2. 设置 Pages 项目，指定构建命令 `npm run build`、构建输出目录 `dist/`。
+3. 在 Pages > Functions 里绑定 KV：`ITINERARIES`、`SETTINGS`，同时将 `SESSION` 绑定指向用于存放会话的 KV（可与 `SETTINGS` 共用）。
+4. 添加环境变量：`DEFAULT_PASSWORD`（可选）、`SESSION_TTL_SECONDS`、`GAODE_REST_KEY`。
+5. 部署后访问站点，输入密码解锁编辑功能。
+
+## 🧪 下一步可拓展方向
+
+- 多人协作：为不同用户生成独立密码或邀请链接。
+- JSON 备份/导入 UI：便于迁移或版本管理。
+- 更丰富的地图联动：地点输入框内直接加载高德地点选择器、路线候选一键写入。
+- PWA 离线模式：缓存最近行程，离线浏览。
+
+> “那就出发吧！”——祝旅途顺利，行程顺心。

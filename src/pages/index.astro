@@ -1,16 +1,37 @@
 ---
-
+import BaseLayout from '../layouts/BaseLayout.astro';
+import HeroBanner from '../components/HeroBanner.astro';
+import OverviewTable from '../components/overview/OverviewTable.svelte';
 ---
-
-<html lang="en">
-	<head>
-		<meta charset="utf-8" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="viewport" content="width=device-width" />
-		<meta name="generator" content={Astro.generator} />
-		<title>Astro</title>
-	</head>
-	<body>
-		<h1>Astro</h1>
-	</body>
-</html>
+<BaseLayout title="YOUtinerary · 那就出发吧！">
+  <HeroBanner
+    slot="hero"
+    actions={[
+      { label: '新建行程', href: '/itinerary/new' },
+      { label: '查看路线指引', href: '#gaode-integration', variant: 'secondary' }
+    ]}
+  />
+  <section class="mt-8">
+    <OverviewTable client:load />
+  </section>
+  <section id="gaode-integration" class="mt-16 flex flex-col gap-6 rounded-3xl border border-slate-800/70 bg-slate-950/80 p-6 text-sm text-slate-200 shadow-lg shadow-sky-500/10">
+    <h2 class="text-2xl font-semibold text-slate-50">高德地图集成指南</h2>
+    <p>
+      按需为交通路线与地点检索启用高德地图 API。在 Cloudflare Pages Functions 中配置一个代理，将前端请求转发给高德服务，隐藏 API Key。
+    </p>
+    <ol class="grid gap-4 text-sm text-slate-300 sm:grid-cols-2">
+      <li class="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-4">
+        1. 在高德开放平台创建应用，获取 Web 服务 Key，限定 referer。
+      </li>
+      <li class="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-4">
+        2. 在 `functions/api/gaode/route.ts` 中配置代理（稍后生成）。
+      </li>
+      <li class="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-4">
+        3. 在前端为地点输入框挂载高德地点选择器，实现自动补全、路线规划。
+      </li>
+      <li class="rounded-2xl border border-slate-800/60 bg-slate-900/60 p-4">
+        4. 针对高频调用设置节流与结果缓存，避免 Key 被滥用。
+      </li>
+    </ol>
+  </section>
+</BaseLayout>

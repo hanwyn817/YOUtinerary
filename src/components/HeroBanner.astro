@@ -1,0 +1,29 @@
+---
+const actions = Astro.props.actions ?? [];
+---
+<section class="relative overflow-hidden border-b border-slate-200 bg-gradient-to-r from-sky-100 via-white to-emerald-100/60">
+  <div class="absolute inset-0 bg-[radial-gradient(circle_at_top_left,_rgba(56,189,248,0.25),_transparent_60%)]"></div>
+  <div class="relative mx-auto flex w-full max-w-5xl flex-col items-start gap-6 px-4 py-16 sm:px-6 lg:px-8">
+    <span class="rounded-full border border-sky-300 bg-white/70 px-3 py-1 text-xs uppercase tracking-[0.3em] text-sky-500">那就出发吧！</span>
+    <h1 class="text-3xl font-semibold text-slate-800 sm:text-5xl">
+      YOUtinerary · 你的私人行程小管家
+    </h1>
+    <p class="max-w-2xl text-base text-slate-600 sm:text-lg">
+      聚合交通、住宿与游玩灵感，随时记录旅行灵感，轻松导出行程，与同行伙伴共享每一天的期待。
+    </p>
+    <div class="flex flex-wrap gap-3">
+      {actions.map((action) => (
+        <a
+          href={action.href}
+          class={`inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-semibold transition ${
+            action.variant === 'secondary'
+              ? 'border border-sky-300 bg-white/70 text-sky-600 hover:border-sky-400 hover:text-sky-500'
+              : 'bg-gradient-to-r from-sky-400 via-sky-500 to-emerald-400 text-white shadow-lg shadow-sky-200 hover:from-sky-300 hover:via-sky-400 hover:to-emerald-300'
+          }`}
+        >
+          {action.label}
+        </a>
+      ))}
+    </div>
+  </div>
+</section>
