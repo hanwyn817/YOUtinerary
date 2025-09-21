@@ -614,36 +614,38 @@ import {
 
     <div
       id="itinerary-export"
-      class="flex flex-col gap-6 rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-700 shadow-xl shadow-sky-100"
+      class="rounded-3xl border border-slate-200 bg-white p-6 text-sm text-slate-700 shadow-xl shadow-sky-100"
     >
-      <header class="flex flex-col gap-2 border-b border-slate-200 pb-4">
+      <header class="flex flex-col gap-2">
         <h2 class="text-2xl font-semibold text-slate-800">{draft.title}</h2>
         {#if draft.description}
           <p class="text-sm text-slate-500">{draft.description}</p>
         {/if}
       </header>
 
-      <section class="rounded-2xl border border-slate-200 bg-sky-50/60 p-4">
-        <h3 class="text-lg font-semibold text-slate-700">费用概览</h3>
-        <div class="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-          <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
-            <span class="text-xs text-slate-500">交通</span>
-            <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.transport ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
-          </div>
-          <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
-            <span class="text-xs text-slate-500">住宿</span>
-            <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.stay ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
-          </div>
-          <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
-            <span class="text-xs text-slate-500">游玩</span>
-            <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.activities ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
-          </div>
-          <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
-            <span class="text-xs text-slate-500">其他</span>
-            <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.others ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
-          </div>
+    </div>
+
+    <section class="rounded-3xl border border-slate-200 bg-sky-50/60 p-6 text-sm text-slate-700 shadow-xl shadow-sky-100">
+      <h3 class="text-lg font-semibold text-slate-700">费用概览</h3>
+      <div class="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+        <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
+          <span class="text-xs text-slate-500">交通</span>
+          <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.transport ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
         </div>
-      </section>
+        <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
+          <span class="text-xs text-slate-500">住宿</span>
+          <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.stay ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
+        </div>
+        <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
+          <span class="text-xs text-slate-500">游玩</span>
+          <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.activities ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
+        </div>
+        <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
+          <span class="text-xs text-slate-500">其他</span>
+          <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.others ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
+        </div>
+      </div>
+    </section>
 
       {#if previewMode}
         <div class="flex flex-col gap-5">
@@ -1165,7 +1167,6 @@ import {
       >
         添加新的一天
       </button>
-    </div>
   </div>
 {/if}
 
