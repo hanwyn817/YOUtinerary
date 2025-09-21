@@ -9,8 +9,16 @@
     LocationPoint,
     TransportMode
   } from '../../lib/types';
-  import { createDayItem, createEmptyDay, uid } from '../../lib/utils/itinerary';
-  import { DAY_ITEM_OPTIONS, getDayItemLabel, suggestGaodeMode } from '../../lib/utils/schedule';
+import { createDayItem, createEmptyDay, uid } from '../../lib/utils/itinerary';
+import {
+  DAY_ITEM_OPTIONS,
+  extractCostDisplay,
+  getDayItemLabel,
+  getTransportModeLabel,
+  summarizeDayItem,
+  summarizeTime,
+  suggestGaodeMode
+} from '../../lib/utils/schedule';
 
   const transportOptions: { value: TransportMode; label: string }[] = [
     { value: 'plane', label: '飞机' },
@@ -36,6 +44,7 @@
   let exporting = false;
   let autoLabelDays = true;
   let routingItemId: string | null = null;
+  let previewMode = false;
 
   $: state = $itineraryStore;
 
@@ -379,6 +388,61 @@
     return getDayItemLabel(type);
   }
 
+  function timelineTime(item: DayItem): string {
+    switch (item.type) {
+      case 'transport':
+        return summarizeTime(item.transport.departTime, item.transport.arriveTime, ' → ');
+      case 'stay':
+        return summarizeTime(item.stay.checkInTime, item.stay.checkOutTime, ' - ');
+      case 'activity':
+        return summarizeTime(item.activity.startTime, item.activity.endTime, ' - ');
+      default:
+        return '';
+    }
+  }
+
+  function timelineCost(item: DayItem): string {
+    const currency = draft?.baseCurrency ?? draft?.totalBudget?.currency ?? 'CNY';
+    return extractCostDisplay(item, currency);
+  }
+
+  function timelineSummary(item: DayItem): string {
+    return summarizeDayItem(item);
+  }
+
+  function timelineMode(item: DayItem): string | null {
+    if (item.type !== 'transport') return null;
+    return getTransportModeLabel(item.transport.mode);
+  }
+
+  function timelineNotes(item: DayItem): string[] {
+    if (item.type === 'transport') {
+      return [item.transport.memo?.trim()].filter(Boolean) as string[];
+    }
+    if (item.type === 'stay') {
+      return [item.stay.memo?.trim()].filter(Boolean) as string[];
+    }
+    if (item.type === 'activity') {
+      return [item.activity.memo?.trim()].filter(Boolean) as string[];
+    }
+    return [];
+  }
+
+  function dayCost(day: ItineraryDay): number {
+    return day.items.reduce((total, item) => {
+      const amount =
+        item.type === 'transport'
+          ? item.transport.cost?.amount
+          : item.type === 'stay'
+            ? item.stay.cost?.amount
+            : item.type === 'activity'
+              ? item.activity.cost?.amount
+              : undefined;
+      if (!amount || Number.isNaN(amount)) return total;
+      return total + amount;
+    }, 0);
+  }
+
   onMount(() => {
     const handler = (event: Event) => {
       const detail = (event as CustomEvent<LocationAppliedDetail>).detail;
@@ -418,15 +482,6 @@
             />
           </label>
           <label class="flex flex-col gap-2 text-sm text-slate-600">
-            行程别名（slug）
-            <input
-              class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-700 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-              bind:value={draft.slug}
-              on:input={markDirty}
-              placeholder="my-next-trip"
-            />
-          </label>
-          <label class="flex flex-col gap-2 text-sm text-slate-600">
             费用基准货币
             <select
               class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-700 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
@@ -458,6 +513,12 @@
             disabled={!dirty}
           >
             {dirty ? '保存行程' : '已保存'}
+          </button>
+          <button
+            class="inline-flex items-center justify-center rounded-full border border-sky-300 px-5 py-2 font-semibold text-sky-600 hover:border-sky-400 hover:text-sky-500"
+            on:click={() => (previewMode = !previewMode)}
+          >
+            {previewMode ? '返回编辑模式' : '行程预览'}
           </button>
           <button
             class="inline-flex items-center justify-center rounded-full border border-slate-300 px-5 py-2 font-semibold text-slate-600 hover:border-sky-400 hover:text-sky-500 disabled:opacity-60"
@@ -509,145 +570,230 @@
         </div>
       </section>
 
-      {#each draft.days as day}
-        <section class="rounded-2xl border border-slate-200 bg-slate-100 p-5">
-          <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-            <div>
-              <input
-                class="text-xl font-semibold text-slate-800 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                value={day.label}
-                on:change={(event) => updateDay(day.id, { label: (event.target as HTMLInputElement).value })}
-              />
-              <div class="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
-                <label class="flex items-center gap-2">
-                  日期（可选）
-                  <input
-                    type="date"
-                    class="rounded-xl border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-200"
-                    value={day.date ?? ''}
-                    on:change={(event) => updateDay(day.id, { date: (event.target as HTMLInputElement).value })}
-                  />
-                </label>
-                <button
-                  class="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
-                  on:click={() => duplicateDay(day.id)}
-                >
-                  复制当天
-                </button>
-                <button
-                  class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:border-red-500/40 hover:text-red-200"
-                  on:click={() => deleteDay(day.id)}
-                >
-                  删除当天
-                </button>
-                <div class="flex items-center gap-1">
+      {#if previewMode}
+        <div class="flex flex-col gap-5">
+          {#each draft.days as day, dayIndex}
+            <article class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5 shadow-inner shadow-slate-100">
+              <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                <div class="flex flex-col gap-1">
+                  <h3 class="text-lg font-semibold text-slate-800">{day.label || `第${dayIndex + 1}天`}</h3>
+                  {#if day.date}
+                    <span class="text-xs text-slate-500">{day.date}</span>
+                  {/if}
+                </div>
+                {#if dayCost(day) > 0}
+                  <span class="inline-flex items-center rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs text-sky-600">
+                    预计费用 {dayCost(day)}{draft.baseCurrency ?? draft.totalBudget?.currency ?? 'CNY'}
+                  </span>
+                {/if}
+              </header>
+              <div class="mt-4 flex flex-col gap-4">
+                {#if day.items.length === 0}
+                  <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-4 py-6 text-center text-sm text-slate-500">
+                    这一天暂未安排。
+                  </div>
+                {:else}
+                  {#each day.items as entry, index}
+                    <div class="relative pl-9">
+                      <span class="absolute left-0 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-sky-500 text-xs font-semibold text-white">{index + 1}</span>
+                      <div class="rounded-2xl border border-slate-200 bg-white/95 p-4 shadow-sm">
+                        <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                          <span>{timelineTime(entry) || '时间未定'}</span>
+                          {#if timelineCost(entry)}
+                            <span class="text-sky-600">{timelineCost(entry)}</span>
+                          {/if}
+                        </div>
+                        <p class="mt-2 text-sm font-semibold text-slate-800">{timelineSummary(entry)}</p>
+                        <div class="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
+                          <span class="rounded-full bg-sky-100 px-2 py-1 text-sky-600">{typeLabel(entry.type)}</span>
+                          {#if timelineMode(entry)}
+                            <span class="rounded-full bg-emerald-100 px-2 py-1 text-emerald-600">{timelineMode(entry)}</span>
+                          {/if}
+                        </div>
+                        {#if timelineNotes(entry).length}
+                          {#each timelineNotes(entry) as note, noteIndex}
+                            <p class="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-relaxed text-slate-500">{note}</p>
+                          {/each}
+                        {/if}
+                      </div>
+                    </div>
+                  {/each}
+                {/if}
+              </div>
+            </article>
+          {/each}
+        </div>
+      {:else}
+        {#each draft.days as day, dayIndex}
+          <section class="rounded-2xl border border-slate-200 bg-slate-100/80 p-5">
+            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+              <div>
+                <input
+                  class="text-xl font-semibold text-slate-800 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                  value={day.label}
+                  on:change={(event) => updateDay(day.id, { label: (event.target as HTMLInputElement).value })}
+                  placeholder={`第${dayIndex + 1}天`}
+                />
+                <div class="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <label class="flex items-center gap-2">
+                    日期（可选）
+                    <input
+                      type="date"
+                      class="rounded-xl border border-slate-300 bg-white px-2 py-1 text-xs text-slate-600 focus:border-sky-400 focus:outline-none focus:ring-1 focus:ring-sky-200"
+                      value={day.date ?? ''}
+                      on:change={(event) => updateDay(day.id, { date: (event.target as HTMLInputElement).value })}
+                    />
+                  </label>
                   <button
-                    class="rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
-                    on:click={() => reorderDay(day.id, -1)}
+                    class="rounded-full border border-slate-300 px-3 py-1 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
+                    on:click={() => duplicateDay(day.id)}
                   >
-                    ↑
+                    复制当天
                   </button>
                   <button
-                    class="rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
-                    on:click={() => reorderDay(day.id, 1)}
+                    class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:border-red-500/40 hover:text-red-400"
+                    on:click={() => deleteDay(day.id)}
                   >
-                    ↓
+                    删除当天
                   </button>
+                  <div class="flex items-center gap-1">
+                    <button
+                      class="rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
+                      on:click={() => reorderDay(day.id, -1)}
+                    >
+                      ↑
+                    </button>
+                    <button
+                      class="rounded-full border border-slate-300 px-2 py-1 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
+                      on:click={() => reorderDay(day.id, 1)}
+                    >
+                      ↓
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                {#if dayCost(day) > 0}
+                  <span class="rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs text-sky-600">
+                    预计费用 {dayCost(day)}{draft.baseCurrency ?? draft.totalBudget?.currency ?? 'CNY'}
+                  </span>
+                {/if}
+                <button
+                  class="rounded-full border border-sky-400 px-3 py-1 text-xs text-sky-600 hover:bg-sky-100"
+                  on:click={() => (autoLabelDays = !autoLabelDays)}
+                >
+                  {autoLabelDays ? '关闭自动标签' : '启用自动标签'}
+                </button>
+              </div>
+            </div>
+
+            <div class="mt-4 md:hidden">
+              <div class="rounded-2xl border border-sky-100 bg-white/80 p-3">
+                <h4 class="text-xs font-semibold uppercase tracking-[0.3em] text-slate-400">今日概览</h4>
+                <div class="mt-3 flex flex-col gap-3">
+                  {#if day.items.length === 0}
+                    <p class="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-500">暂无安排</p>
+                  {:else}
+                    {#each day.items as entry, index}
+                      <div class="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-sm">
+                        <div class="flex items-center justify-between gap-2 text-xs text-slate-500">
+                          <span>{timelineTime(entry) || `#${index + 1}`}</span>
+                          {#if timelineCost(entry)}
+                            <span class="text-sky-600">{timelineCost(entry)}</span>
+                          {/if}
+                        </div>
+                        <p class="mt-1 text-sm font-semibold text-slate-700">{timelineSummary(entry)}</p>
+                      </div>
+                    {/each}
+                  {/if}
                 </div>
               </div>
             </div>
-            <button
-              class="self-start rounded-full border border-sky-400 px-3 py-1 text-xs text-sky-600 hover:bg-sky-100"
-              on:click={() => (autoLabelDays = !autoLabelDays)}
-            >
-              {autoLabelDays ? '关闭自动标签' : '启用自动标签'}
-            </button>
-          </div>
 
-          <div class="mt-4 flex flex-col gap-4">
-            {#if day.items.length === 0}
-              <p class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">暂无安排，添加一条交通 / 住宿 / 游玩记录开始吧。</p>
-            {/if}
-            {#each day.items as entry, index}
-              <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                  <div class="flex items-center gap-2 text-xs text-slate-500">
-                    <span class="rounded-full border border-sky-200 px-2 py-0.5 text-sky-600">{typeLabel(entry.type)}</span>
-                    <span class="text-slate-500">#{index + 1}</span>
+            <div class="mt-4 flex flex-col gap-4">
+              {#if day.items.length === 0}
+                <p class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">暂无安排，添加一条交通 / 住宿 / 游玩记录开始吧。</p>
+              {/if}
+              {#each day.items as entry, index}
+                <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center gap-2 text-xs text-slate-500">
+                      <span class="rounded-full border border-sky-200 px-2 py-0.5 text-sky-600">{typeLabel(entry.type)}</span>
+                      <span class="text-slate-500">#{index + 1}</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs">
+                      <button
+                        class="rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:border-sky-300 hover:text-sky-500"
+                        on:click={() => moveItem(day.id, entry.id, -1)}
+                      >
+                        上移
+                      </button>
+                      <button
+                        class="rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:border-sky-300 hover:text-sky-500"
+                        on:click={() => moveItem(day.id, entry.id, 1)}
+                      >
+                        下移
+                      </button>
+                      <button
+                        class="rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:border-red-300 hover:text-red-400"
+                        on:click={() => deleteItem(day.id, entry.id)}
+                      >
+                        删除
+                      </button>
+                    </div>
                   </div>
-                  <div class="flex items-center gap-2 text-xs">
-                    <button
-                      class="rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:border-sky-300 hover:text-sky-500"
-                      on:click={() => moveItem(day.id, entry.id, -1)}
-                    >
-                      上移
-                    </button>
-                    <button
-                      class="rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:border-sky-300 hover:text-sky-500"
-                      on:click={() => moveItem(day.id, entry.id, 1)}
-                    >
-                      下移
-                    </button>
-                    <button
-                      class="rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:border-red-300 hover:text-red-400"
-                      on:click={() => deleteItem(day.id, entry.id)}
-                    >
-                      删除
-                    </button>
-                  </div>
-                </div>
 
-                {#if entry.type === 'transport'}
-                  <div class="mt-3 flex flex-col gap-3">
-                    <div class="grid gap-3 sm:grid-cols-2">
-                      <label class="flex flex-col gap-1 text-xs text-slate-600">
-                        出发地
-                        <div class="flex gap-2">
-                          <input
-                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                            bind:value={entry.transport.from}
-                            on:input={markDirty}
-                          />
-                          <button
-                            type="button"
-                            class="whitespace-nowrap rounded-full border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
-                            on:click={() =>
-                              openLocationPicker({
-                                entity: 'transport-from',
-                                dayId: day.id,
-                                itemId: entry.id,
-                                existing: entry.transport.fromLocation
-                              })
-                            }
-                          >
-                            选地点
-                          </button>
-                        </div>
-                      </label>
-                      <label class="flex flex-col gap-1 text-xs text-slate-600">
-                        到达地
-                        <div class="flex gap-2">
-                          <input
-                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                            bind:value={entry.transport.to}
-                            on:input={markDirty}
-                          />
-                          <button
-                            type="button"
-                            class="whitespace-nowrap rounded-full border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
-                            on:click={() =>
-                              openLocationPicker({
-                                entity: 'transport-to',
-                                dayId: day.id,
-                                itemId: entry.id,
-                                existing: entry.transport.toLocation
-                              })
-                            }
-                          >
-                            选地点
-                          </button>
-                        </div>
-                      </label>
+                  {#if entry.type === 'transport'}
+                    <div class="mt-3 flex flex-col gap-3">
+                      <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="flex flex-col gap-1 text-xs text-slate-600">
+                          出发地
+                          <div class="flex gap-2">
+                            <input
+                              class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                              bind:value={entry.transport.from}
+                              on:input={markDirty}
+                            />
+                            <button
+                              type="button"
+                              class="whitespace-nowrap rounded-full border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
+                              on:click={() =>
+                                openLocationPicker({
+                                  entity: 'transport-from',
+                                  dayId: day.id,
+                                  itemId: entry.id,
+                                  existing: entry.transport.fromLocation
+                                })
+                              }
+                            >
+                              选地点
+                            </button>
+                          </div>
+                        </label>
+                        <label class="flex flex-col gap-1 text-xs text-slate-600">
+                          到达地
+                          <div class="flex gap-2">
+                            <input
+                              class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                              bind:value={entry.transport.to}
+                              on:input={markDirty}
+                            />
+                            <button
+                              type="button"
+                              class="whitespace-nowrap rounded-full border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
+                              on:click={() =>
+                                openLocationPicker({
+                                  entity: 'transport-to',
+                                  dayId: day.id,
+                                  itemId: entry.id,
+                                  existing: entry.transport.toLocation
+                                })
+                              }
+                            >
+                              选地点
+                            </button>
+                          </div>
+                        </label>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-4">
                       <label class="flex flex-col gap-1 text-xs text-slate-600">
@@ -935,6 +1081,8 @@
           </div>
         </section>
       {/each}
+
+      {/if}
 
       <button
         class="self-start rounded-full border border-sky-400 px-4 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-100"

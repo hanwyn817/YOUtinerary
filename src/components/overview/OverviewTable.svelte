@@ -22,9 +22,17 @@ import {
     modeLabel?: string;
   }
 
+  interface DayBucket {
+    key: string;
+    label: string;
+    date?: string;
+    rows: TableRow[];
+  }
+
   interface ItineraryGroup {
     itinerary: Itinerary;
-    rows: TableRow[];
+    tableRows: TableRow[];
+    dayBuckets: DayBucket[];
   }
 
   let loading = true;
@@ -46,10 +54,11 @@ import {
   function buildGroups(list: Itinerary[]): ItineraryGroup[] {
     return list.map((itinerary) => {
       const baseCurrency = itinerary.baseCurrency ?? itinerary.totalBudget?.currency ?? 'CNY';
-      const rows: TableRow[] = [];
+      const tableRows: TableRow[] = [];
+      const dayBuckets: DayBucket[] = [];
 
       if (!itinerary.days?.length) {
-        rows.push({
+        const placeholder: TableRow = {
           id: `${itinerary.id}-overview`,
           dayLabel: '行程概览',
           date: undefined,
@@ -58,13 +67,20 @@ import {
           summary: itinerary.description?.trim() || '（暂无具体安排）',
           time: '',
           cost: ''
+        };
+        tableRows.push(placeholder);
+        dayBuckets.push({
+          key: `${itinerary.id}-overview`,
+          label: '行程概览',
+          rows: [placeholder]
         });
       } else {
         for (const day of itinerary.days) {
+          const bucketRows: TableRow[] = [];
           const items = day.items && day.items.length > 0 ? day.items : [createPlaceholderNote()];
           items.forEach((item, index) => {
             const itemId = item.id ?? `item-${index}`;
-            rows.push({
+            const row: TableRow = {
               id: `${itinerary.id}-${day.id}-${itemId}`,
               dayLabel: day.label,
               date: day.date,
@@ -74,12 +90,20 @@ import {
               time: extractTime(item),
               cost: extractCostDisplay(item, baseCurrency),
               modeLabel: item.type === 'transport' ? getTransportModeLabel(item.transport.mode) : undefined
-            });
+            };
+            tableRows.push(row);
+            bucketRows.push(row);
+          });
+          dayBuckets.push({
+            key: `${itinerary.id}-${day.id}`,
+            label: day.label,
+            date: day.date,
+            rows: bucketRows
           });
         }
       }
 
-      return { itinerary, rows };
+      return { itinerary, tableRows, dayBuckets };
     });
   }
 
@@ -150,7 +174,56 @@ import {
             </a>
           </header>
 
-          <div class="mt-4 overflow-x-auto">
+          <div class="mt-4 flex flex-col gap-4 md:hidden">
+            {#each group.dayBuckets as bucket (bucket.key)}
+              <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner shadow-slate-100">
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex flex-col gap-1">
+                    <span class="text-sm font-semibold text-slate-800">{bucket.label || '未命名日程'}</span>
+                    {#if bucket.date}
+                      <span class="text-xs text-slate-500">{bucket.date}</span>
+                    {/if}
+                  </div>
+                  <a
+                    href={`/itinerary/${group.itinerary.id}`}
+                    class="inline-flex items-center justify-center rounded-full border border-sky-300 px-3 py-1 text-xs text-sky-600 hover:border-sky-400 hover:text-sky-500"
+                  >
+                    查看详情
+                  </a>
+                </div>
+                <div class="mt-4 flex flex-col gap-3">
+                  {#if bucket.rows.length === 0}
+                    <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-3 py-4 text-xs text-slate-500">
+                      这一天还没有安排。
+                    </div>
+                  {:else}
+                    {#each bucket.rows as row (row.id)}
+                      <div class="relative pl-5">
+                        <span class="absolute left-1 top-2 h-2 w-2 -translate-x-1/2 rounded-full bg-sky-400"></span>
+                        <div class="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+                          <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                            <span>{row.time || '时间未定'}</span>
+                            {#if row.cost}
+                              <span class="text-sky-600">{row.cost}</span>
+                            {/if}
+                          </div>
+                          <p class="mt-2 text-sm font-medium text-slate-700">{row.summary}</p>
+                          <div class="mt-3 flex flex-wrap gap-2">
+                            <span class="rounded-full bg-sky-100 px-2 py-1 text-xs text-sky-600">{row.typeLabel}</span>
+                            {#if row.modeLabel}
+                              <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-600">{row.modeLabel}</span>
+                            {/if}
+                          </div>
+                        </div>
+                      </div>
+                    {/each}
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+
+          <div class="mt-4 hidden overflow-x-auto md:block">
             <table class="min-w-full divide-y divide-slate-200 text-left text-sm text-slate-700">
               <thead class="bg-slate-100 text-xs uppercase tracking-wider text-slate-500">
                 <tr>
@@ -162,7 +235,7 @@ import {
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-100">
-                {#each group.rows as row (row.id)}
+                {#each group.tableRows as row (row.id)}
                   <tr class="hover:bg-slate-50">
                     <td class="px-4 py-3 align-top">
                       <div class="flex flex-col gap-1">
