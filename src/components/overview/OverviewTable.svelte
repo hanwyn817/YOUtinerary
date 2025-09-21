@@ -39,6 +39,7 @@ import {
   let error: string | null = null;
   let itineraries: Itinerary[] = [];
   let groups: ItineraryGroup[] = [];
+  let collapsedBuckets: Set<string> = new Set();
 
   onMount(async () => {
     try {
@@ -124,26 +125,23 @@ import {
         return '';
     }
   }
+
+  function toggleBucket(id: string) {
+    const next = new Set(collapsedBuckets);
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    collapsedBuckets = next;
+  }
+
+  function isBucketCollapsed(id: string): boolean {
+    return collapsedBuckets.has(id);
+  }
 </script>
 
 <section class="flex flex-col gap-6">
-  <div class="rounded-3xl border border-slate-200 bg-white/90 p-6 shadow-lg shadow-sky-100">
-    <div class="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h2 class="text-xl font-semibold text-slate-800">行程总览</h2>
-        <p class="text-sm text-slate-500">纵览所有行程的每日安排，快速了解节奏与重点。</p>
-      </div>
-      <div class="flex flex-wrap gap-3">
-        <a
-          href="/itinerary/new"
-          class="inline-flex items-center justify-center rounded-full bg-gradient-to-r from-sky-500 via-sky-400 to-emerald-400 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-sky-200 hover:from-sky-400 hover:via-sky-300 hover:to-emerald-300"
-        >
-          新建行程
-        </a>
-      </div>
-    </div>
-  </div>
-
   {#if loading}
     <div class="flex items-center justify-center rounded-3xl border border-slate-200 bg-sky-50 py-12 text-sm text-slate-500">
       正在加载行程...
@@ -178,52 +176,72 @@ import {
 
           <div class="mt-4 flex flex-col gap-4 md:hidden">
             {#each group.dayBuckets as bucket (bucket.key)}
-              <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner shadow-slate-100">
-                <div class="flex items-start justify-between gap-3">
+              {@const panelId = `${bucket.key}-panel`}
+              <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner shadow-slate-100">
+                <button
+                  type="button"
+                  class="flex w-full items-start justify-between gap-3 text-left"
+                  on:click={() => toggleBucket(bucket.key)}
+                  aria-expanded={!isBucketCollapsed(bucket.key)}
+                  aria-controls={panelId}
+                >
                   <div class="flex flex-col gap-1">
                     <span class="text-sm font-semibold text-slate-800">{bucket.label || '未命名日程'}</span>
                     {#if bucket.date}
                       <span class="text-xs text-slate-500">{bucket.date}</span>
                     {/if}
                   </div>
-                  <a
-                    href={`/itinerary/${group.itinerary.id}`}
-                    class="inline-flex items-center justify-center rounded-full border border-sky-300 px-3 py-1 text-xs text-sky-600 hover:border-sky-400 hover:text-sky-500"
-                  >
-                    查看详情
-                  </a>
-                </div>
-                <div class="mt-4 flex flex-col gap-3">
-                  {#if bucket.rows.length === 0}
-                    <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-3 py-4 text-xs text-slate-500">
-                      这一天还没有安排。
-                    </div>
-                  {:else}
-                    {#each bucket.rows as row (row.id)}
-                      <div class="relative pl-5">
-                        <span class="absolute left-1 top-2 h-2 w-2 -translate-x-1/2 rounded-full bg-sky-400"></span>
-                        <div class="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
-                          <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                            <span>{row.time || '时间未定'}</span>
-                            {#if row.cost}
-                              <span class="text-sky-600">{row.cost}</span>
-                            {/if}
-                          </div>
-                          <p class="mt-2 text-sm font-medium text-slate-700">{row.summary}</p>
-                          <div class="mt-3 flex flex-wrap gap-2">
-                            <span class="rounded-full bg-sky-100 px-2 py-1 text-xs text-sky-600">{row.typeLabel}</span>
-                            {#if row.modeLabel}
-                              <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-600">{row.modeLabel}</span>
-                            {/if}
+                  <span class="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-2 py-1 text-xs text-slate-500">
+                    {isBucketCollapsed(bucket.key) ? '展开' : '收起'}
+                    <svg
+                      class={`ml-2 h-3 w-3 text-slate-400 transition-transform duration-200 ${
+                        isBucketCollapsed(bucket.key) ? 'rotate-180' : ''
+                      }`}
+                      viewBox="0 0 20 20"
+                      fill="currentColor"
+                      aria-hidden="true"
+                    >
+                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" />
+                    </svg>
+                  </span>
+                </button>
+
+                {#if !isBucketCollapsed(bucket.key)}
+                  <div id={panelId} class="mt-3 flex flex-col gap-2">
+                    {#if bucket.rows.length === 0}
+                      <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-3 py-4 text-xs text-slate-500">
+                        这一天还没有安排。
+                      </div>
+                    {:else}
+                      {#each bucket.rows as row (row.id)}
+                        <div class="relative pl-4">
+                          <span class="absolute left-1 top-2 h-2 w-2 -translate-x-1/2 rounded-full bg-sky-400"></span>
+                          <div class="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
+                            <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
+                              <div class="flex flex-wrap items-center gap-2">
+                                <span>{row.time || '时间未定'}</span>
+                                <span class="rounded-full bg-sky-100 px-2 py-1 text-xs text-sky-600">{row.typeLabel}</span>
+                                {#if row.modeLabel}
+                                  <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-600">{row.modeLabel}</span>
+                                {/if}
+                              </div>
+                              {#if row.cost}
+                                <span class="text-sky-600">{row.cost}</span>
+                              {/if}
+                            </div>
+                            <p class="mt-1.5 text-sm font-medium text-slate-700">{row.summary}</p>
                           </div>
                         </div>
-                      </div>
-                    {/each}
-                  {/if}
-                </div>
+                      {/each}
+                    {/if}
+                  </div>
+                {:else}
+                  <div id={panelId} hidden></div>
+                {/if}
               </div>
             {/each}
           </div>
+
 
           <div class="mt-4 hidden overflow-x-auto md:block">
             <table class="min-w-full divide-y divide-slate-200 text-left text-sm text-slate-700">
