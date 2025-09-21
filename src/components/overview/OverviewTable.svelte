@@ -40,11 +40,14 @@ import {
   let itineraries: Itinerary[] = [];
   let groups: ItineraryGroup[] = [];
   let collapsedBuckets: Set<string> = new Set();
+  let mobileExpanded: Record<string, boolean> = {};
 
   onMount(async () => {
     try {
       itineraries = await fetchItinerariesFull();
       groups = buildGroups(itineraries);
+      collapsedBuckets = collectAllBucketKeys(groups);
+      mobileExpanded = {};
     } catch (err) {
       error = (err as Error).message ?? '加载行程失败';
     } finally {
@@ -113,6 +116,16 @@ import {
     return { id: `placeholder-${suffix}`, type: 'note', note: { id: `note-${suffix}`, text: '（暂无安排）' } };
   }
 
+  function collectAllBucketKeys(list: ItineraryGroup[]): Set<string> {
+    const keys = new Set<string>();
+    for (const group of list) {
+      for (const bucket of group.dayBuckets) {
+        keys.add(bucket.key);
+      }
+    }
+    return keys;
+  }
+
   function extractTime(item: DayItem): string {
     switch (item.type) {
       case 'transport':
@@ -139,6 +152,35 @@ import {
   function isBucketCollapsed(id: string): boolean {
     return collapsedBuckets.has(id);
   }
+
+  function setBucketsStateForItinerary(itineraryId: string, shouldCollapse: boolean) {
+    const targetGroup = groups.find((group) => group.itinerary.id === itineraryId);
+    if (!targetGroup) return;
+    const next = new Set(collapsedBuckets);
+    for (const bucket of targetGroup.dayBuckets) {
+      if (shouldCollapse) {
+        next.add(bucket.key);
+      } else {
+        next.delete(bucket.key);
+      }
+    }
+    collapsedBuckets = next;
+  }
+
+  function toggleMobileItinerary(itineraryId: string) {
+    const currentlyExpanded = mobileExpanded[itineraryId] ?? false;
+    const nextExpanded = { ...mobileExpanded, [itineraryId]: !currentlyExpanded };
+    if (!nextExpanded[itineraryId]) {
+      delete nextExpanded[itineraryId];
+    }
+    mobileExpanded = nextExpanded;
+
+    if (mobileExpanded[itineraryId]) {
+      setBucketsStateForItinerary(itineraryId, false);
+    } else {
+      setBucketsStateForItinerary(itineraryId, true);
+    }
+  }
 </script>
 
 <section class="flex flex-col gap-6">
@@ -157,6 +199,7 @@ import {
   {:else}
     <div class="grid gap-6">
       {#each groups as group (group.itinerary.id)}
+        {@const isItineraryExpanded = mobileExpanded[group.itinerary.id] ?? false}
         <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-sky-100">
           <header class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex flex-col gap-2">
@@ -174,40 +217,40 @@ import {
             </a>
           </header>
 
-          <div class="mt-4 flex flex-col gap-4 md:hidden">
-            {#each group.dayBuckets as bucket (bucket.key)}
-              {@const panelId = `${bucket.key}-panel`}
-              <div class="relative overflow-hidden rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner shadow-slate-100">
-                <button
-                  type="button"
-                  class="flex w-full items-start justify-between gap-3 text-left"
-                  on:click={() => toggleBucket(bucket.key)}
-                  aria-expanded={!isBucketCollapsed(bucket.key)}
-                  aria-controls={panelId}
-                >
+          <div class="mt-4 md:hidden">
+            <button
+              type="button"
+              class="flex w-full items-center justify-between rounded-3xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-inner shadow-slate-100"
+              on:click={() => toggleMobileItinerary(group.itinerary.id)}
+              aria-expanded={isItineraryExpanded}
+              aria-controls={`mobile-itinerary-${group.itinerary.id}`}
+            >
+              <span>{isItineraryExpanded ? '收起行程' : '展开行程'}</span>
+              <svg
+                class={`h-4 w-4 text-slate-500 transition-transform duration-200 ${
+                  isItineraryExpanded ? 'rotate-180' : ''
+                }`}
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                aria-hidden="true"
+              >
+                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" />
+              </svg>
+            </button>
+          </div>
+
+          {#if isItineraryExpanded}
+            <div id={`mobile-itinerary-${group.itinerary.id}`} class="mt-3 flex flex-col gap-4 md:hidden">
+              {#each group.dayBuckets as bucket (bucket.key)}
+                <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner shadow-slate-100">
                   <div class="flex flex-col gap-1">
                     <span class="text-sm font-semibold text-slate-800">{bucket.label || '未命名日程'}</span>
                     {#if bucket.date}
                       <span class="text-xs text-slate-500">{bucket.date}</span>
                     {/if}
                   </div>
-                  <span class="inline-flex items-center rounded-full border border-slate-200 bg-white/70 px-2 py-1 text-xs text-slate-500">
-                    {isBucketCollapsed(bucket.key) ? '展开' : '收起'}
-                    <svg
-                      class={`ml-2 h-3 w-3 text-slate-400 transition-transform duration-200 ${
-                        isBucketCollapsed(bucket.key) ? 'rotate-180' : ''
-                      }`}
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                      aria-hidden="true"
-                    >
-                      <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" />
-                    </svg>
-                  </span>
-                </button>
 
-                {#if !isBucketCollapsed(bucket.key)}
-                  <div id={panelId} class="mt-3 flex flex-col gap-2">
+                  <div class="mt-3 flex flex-col gap-2">
                     {#if bucket.rows.length === 0}
                       <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-3 py-4 text-xs text-slate-500">
                         这一天还没有安排。
@@ -235,12 +278,12 @@ import {
                       {/each}
                     {/if}
                   </div>
-                {:else}
-                  <div id={panelId} hidden></div>
-                {/if}
-              </div>
-            {/each}
-          </div>
+                </div>
+              {/each}
+            </div>
+          {:else}
+            <div id={`mobile-itinerary-${group.itinerary.id}`} hidden></div>
+          {/if}
 
 
           <div class="mt-4 hidden overflow-x-auto md:block">
