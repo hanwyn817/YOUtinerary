@@ -1,9 +1,9 @@
 import type { DayItem, DayItemType, TransportMode } from '../types';
 
 export const DAY_ITEM_LABELS: Record<DayItemType, string> = {
-  transport: '交通安排',
-  activity: '游玩安排',
-  stay: '住宿安排',
+  transport: '交通',
+  activity: '游玩',
+  stay: '住宿',
   note: '备注'
 };
 
