@@ -21,8 +21,7 @@
 │   ├── layouts/             # Astro 布局
 │   ├── lib/                 # 前端类型、API 客户端、store 与工具函数
 │   └── pages/               # Astro 页面入口
-├── functions/
-│   └── api/                 # Cloudflare Pages Functions 路由
+├── src/pages/api/           # Cloudflare Pages Functions（Astro API Routes）
 ├── public/                  # 静态资源
 ├── wrangler.toml            # Cloudflare KV & 变量绑定示例
 ├── .env.example             # 本地调试所需环境变量示例
@@ -52,7 +51,7 @@ npm run dev:pages    # 先 build，再通过 wrangler pages dev 调起 Functions
 
 ## 🌐 高德地图代理
 
-- API 位置：`functions/api/gaode/route.ts`
+- API 位置：`src/pages/api/gaode/route.ts`
 - 请求参数：`mode`（driving/transit/walking/bicycling）、`origin`、`destination`。
 - 代理要求：已解锁编辑权限的用户才能调用，防止滥用。
 - 需在 Cloudflare 环境变量中设置 `GAODE_REST_KEY`。
@@ -62,10 +61,10 @@ npm run dev:pages    # 先 build，再通过 wrangler pages dev 调起 Functions
 ## 📄 部署到 Cloudflare Pages
 
 1. 构建：`npm run build`
-2. 设置 Pages 项目，指定构建命令 `npm run build`、构建输出目录 `dist/`。
-3. 在 Pages > Functions 里绑定 KV：`ITINERARIES`、`SETTINGS`，同时将 `SESSION` 绑定指向用于存放会话的 KV（可与 `SETTINGS` 共用）。
-4. 添加环境变量：`DEFAULT_PASSWORD`（可选）、`SESSION_TTL_SECONDS`、`GAODE_REST_KEY`。
-5. 部署后访问站点，输入密码解锁编辑功能。
+2. Cloudflare Pages 控制台中新建项目，构建命令填写 `npm run build`，输出目录 `dist/`。
+3. 在 **Settings → Functions** 中绑定 KV 名称空间：`ITINERARIES`（存行程）、`SETTINGS`（存密码哈希等配置）、`SESSION`（存登录会话，建议单独创建）。
+4. 在 **Settings → Environment variables** 为生产/预览环境添加：`GAODE_REST_KEY`、`SESSION_TTL_SECONDS`（默认 28800 秒，可按需调整）、`DEFAULT_PASSWORD`（可选，用于首次初始化）。
+5. 触发部署，首次进入站点时使用密码解锁即可开始编辑。
 
 ## 🧪 下一步可拓展方向
 
