@@ -48,6 +48,9 @@ import {
   let exportLayoutVisible = false;
   let exportQrDataUrl = '';
   let exportPageUrl = '';
+  let confirmingDelete = false;
+  let deleting = false;
+  let deleteError: string | null = null;
 
   $: state = $itineraryStore;
 
@@ -354,6 +357,33 @@ import {
     }
   }
 
+  function openDeleteConfirm() {
+    deleteError = null;
+    confirmingDelete = true;
+  }
+
+  function closeDeleteConfirm() {
+    if (deleting) return;
+    confirmingDelete = false;
+    deleteError = null;
+  }
+
+  async function handleDelete() {
+    if (!draft || deleting) return;
+    deleting = true;
+    deleteError = null;
+    const ok = await itineraryStore.removeItinerary(draft.id);
+    deleting = false;
+    if (ok) {
+      confirmingDelete = false;
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      }
+    } else {
+      deleteError = state.error ?? '删除失败，请稍后重试。';
+    }
+  }
+
   async function exportAsImage() {
     if (!draft) return;
     exporting = true;
@@ -570,6 +600,13 @@ import {
             on:click={copyItinerary}
           >
             复制行程
+          </button>
+          <button
+            class="inline-flex items-center justify-center rounded-full border border-red-200 px-5 py-2 font-semibold text-red-500 hover:border-red-300 hover:text-red-600 disabled:opacity-60"
+            on:click={openDeleteConfirm}
+            disabled={!state.editingUnlocked || deleting}
+          >
+            删除行程
           </button>
         </div>
       </div>
@@ -1231,6 +1268,36 @@ import {
           </div>
         </div>
       </footer>
+    </div>
+  </div>
+{/if}
+
+{#if confirmingDelete}
+  <div class="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/70 px-4">
+    <div class="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+      <h3 class="text-lg font-semibold text-slate-900">确认删除行程</h3>
+      <p class="mt-3 text-sm text-slate-600">
+        确定要删除当前行程吗？删除后无法恢复，所有安排与备注都会被清除。
+      </p>
+      {#if deleteError}
+        <p class="mt-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-2 text-sm text-red-600">{deleteError}</p>
+      {/if}
+      <div class="mt-6 flex justify-end gap-3 text-sm">
+        <button
+          class="rounded-full border border-slate-200 px-4 py-2 text-slate-600 hover:border-slate-300 hover:text-slate-700"
+          on:click={closeDeleteConfirm}
+          disabled={deleting}
+        >
+          取消
+        </button>
+        <button
+          class="rounded-full border border-red-200 bg-red-500 px-4 py-2 font-semibold text-white shadow hover:bg-red-400 disabled:opacity-60"
+          on:click={handleDelete}
+          disabled={deleting}
+        >
+          {deleting ? '删除中…' : '确认删除'}
+        </button>
+      </div>
     </div>
   </div>
 {/if}

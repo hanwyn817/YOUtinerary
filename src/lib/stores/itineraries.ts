@@ -81,7 +81,7 @@ function createStore() {
     }
   }
 
-  async function removeItinerary(id: string) {
+  async function removeItinerary(id: string): Promise<boolean> {
     update((state) => ({ ...state, loading: true, error: null }));
     try {
       await deleteItinerary(id);
@@ -91,8 +91,10 @@ function createStore() {
         activeItinerary: state.activeItinerary?.id === id ? null : state.activeItinerary,
         list: state.list.filter((it) => it.id !== id)
       }));
+      return true;
     } catch (error) {
       update((state) => ({ ...state, loading: false, error: (error as Error).message }));
+      return false;
     }
   }
 
