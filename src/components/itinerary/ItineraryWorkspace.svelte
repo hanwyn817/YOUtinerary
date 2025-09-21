@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
+import { onMount, tick } from 'svelte';
   import { itineraryStore } from '../../lib/stores/itineraries';
   import type {
     DayItem,
@@ -45,6 +45,9 @@ import {
   let autoLabelDays = true;
   let routingItemId: string | null = null;
   let previewMode = false;
+  let exportLayoutVisible = false;
+  let exportQrDataUrl = '';
+  let exportPageUrl = '';
 
   $: state = $itineraryStore;
 
@@ -353,16 +356,50 @@ import {
 
   async function exportAsImage() {
     if (!draft) return;
-    const element = document.getElementById('itinerary-export');
-    if (!element) return;
     exporting = true;
     try {
-      const html2canvas = (await import('html2canvas')).default;
-      const canvas = await html2canvas(element, {
-        backgroundColor: '#020617',
-        scale: window.devicePixelRatio > 1 ? 2 : 1.5,
-        useCORS: true
+      const [{ default: html2canvas }, qrModule] = await Promise.all([
+        import('html2canvas'),
+        import('qrcode')
+      ]);
+
+      const QRCode = (qrModule as any).default ?? qrModule;
+      if (!QRCode?.toDataURL) {
+        throw new Error('二维码模块加载失败');
+      }
+
+      const itineraryUrl = new URL(`/itinerary/${draft.id}`, window.location.origin).toString();
+      exportPageUrl = itineraryUrl;
+      exportQrDataUrl = await QRCode.toDataURL(itineraryUrl, {
+        width: 320,
+        margin: 2,
+        color: {
+          dark: '#0f172a',
+          light: '#ffffff'
+        }
       });
+
+      exportLayoutVisible = true;
+      await tick();
+
+      const element = document.getElementById('itinerary-export-sheet');
+      if (!element) {
+        throw new Error('未找到导出容器');
+      }
+
+      const canvas = await html2canvas(element, {
+        backgroundColor: '#0f172a',
+        scale: Math.min(window.devicePixelRatio || 2, 3),
+        useCORS: true,
+        onclone: (clonedDocument) => {
+          clonedDocument.querySelectorAll('style, link[rel="stylesheet"]').forEach((node) => {
+            node.remove();
+          });
+          clonedDocument.body.style.background = '#020617';
+          clonedDocument.body.style.color = '#e2e8f0';
+        }
+      });
+
       const link = document.createElement('a');
       link.href = canvas.toDataURL('image/png');
       link.download = `${draft.slug || draft.id}.png`;
@@ -371,6 +408,7 @@ import {
       console.error(error);
       alert('导出失败，请稍后重试。');
     } finally {
+      exportLayoutVisible = false;
       exporting = false;
     }
   }
@@ -1090,6 +1128,109 @@ import {
       >
         添加新的一天
       </button>
+    </div>
+  </div>
+{/if}
+
+{#if exportLayoutVisible && draft}
+  <div style="position: fixed; left: -9999px; top: 0; width: 0; height: 0; overflow: visible;">
+    <div
+      id="itinerary-export-sheet"
+      style="all: initial; display: block; width: 720px; margin: 0 auto; overflow: hidden; border-radius: 28px; padding: 36px; background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%); color: #0f172a; font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; box-sizing: border-box;"
+    >
+      <header style="display: flex; flex-direction: column; gap: 20px; border-bottom: 1px solid #dbe3f0; padding-bottom: 28px;">
+        <div style="display: flex; flex-direction: column; gap: 8px;">
+          <span style="display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 14px; font-size: 13px; font-weight: 600; background: rgba(14, 116, 144, 0.12); color: #0e7490; width: fit-content;">
+            YOUtinerary · 灵感随行
+          </span>
+          <h1 style="margin: 0; font-size: 36px; font-weight: 600; line-height: 1.2; color: #0f172a;">{draft.title}</h1>
+          {#if draft.description}
+            <p style="margin: 0; font-size: 16px; color: #475569; line-height: 1.7;">{draft.description}</p>
+          {/if}
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 18px; font-size: 14px; color: #64748b;">
+          <span>更新于 {new Date(draft.updatedAt ?? draft.createdAt ?? Date.now()).toLocaleString('zh-CN')}</span>
+          <span>行程天数：{draft.days.length}</span>
+          <span>基准货币：{draft.baseCurrency ?? 'CNY'}</span>
+        </div>
+      </header>
+
+      {#each draft.days as day, dayIndex}
+        <section style="margin-top: 28px; border-radius: 26px; border: 1px solid #dbe3f0; background: rgba(255, 255, 255, 0.9); padding: 28px; box-shadow: 0 18px 40px rgba(100, 116, 139, 0.08);">
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; flex-direction: column; gap: 4px;">
+              <h2 style="margin: 0; font-size: 24px; font-weight: 600; color: #0f172a;">{day.label || `第${dayIndex + 1}天`}</h2>
+              {#if day.date}
+                <span style="font-size: 14px; color: #64748b;">{day.date}</span>
+              {/if}
+            </div>
+            {#if dayCost(day) > 0}
+              <span style="display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(14, 116, 144, 0.2); background: rgba(186, 230, 253, 0.35); color: #0e7490; width: fit-content;">
+                当日预算 {dayCost(day)}{draft.baseCurrency ?? draft.totalBudget?.currency ?? 'CNY'}
+              </span>
+            {/if}
+          </div>
+
+          <div style="margin-top: 20px; display: flex; flex-direction: column; gap: 20px;">
+            {#if day.items.length === 0}
+              <div style="border-radius: 20px; border: 1px dashed rgba(148, 163, 184, 0.4); background: rgba(226, 232, 240, 0.5); padding: 28px; text-align: center; font-size: 15px; color: #475569;">
+                这一天暂未安排。
+              </div>
+            {:else}
+              {#each day.items as entry, index}
+                <div style="display: flex; gap: 20px;">
+                  <div style="display: flex; flex-direction: column; align-items: center;">
+                    <span style="display: flex; align-items: center; justify-content: center; width: 32px; height: 32px; border-radius: 16px; font-size: 13px; font-weight: 600; background: rgba(14, 116, 144, 0.15); color: #0e7490;">
+                      {index + 1}
+                    </span>
+                    {#if index < day.items.length - 1}
+                      <span style="margin-top: 4px; flex: 1; width: 1px; background: rgba(148, 163, 184, 0.4);"></span>
+                    {/if}
+                  </div>
+                  <div style="flex: 1; display: flex; flex-direction: column; gap: 10px; border-radius: 20px; border: 1px solid #dbe3f0; background: rgba(255, 255, 255, 0.95); padding: 20px;">
+                    <div style="display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px; font-size: 14px; color: #64748b;">
+                      <span>{timelineTime(entry) || '时间未定'}</span>
+                      {#if timelineCost(entry)}
+                        <span style="color: #0f766e; font-weight: 600;">{timelineCost(entry)}</span>
+                      {/if}
+                    </div>
+                    <p style="margin: 0; font-size: 18px; font-weight: 600; color: #0f172a; line-height: 1.5;">{timelineSummary(entry)}</p>
+                    <div style="display: flex; flex-wrap: wrap; gap: 10px; font-size: 13px;">
+                      <span style="border-radius: 999px; padding: 5px 10px; background: rgba(2, 132, 199, 0.15); color: #0c4a6e;">{typeLabel(entry.type)}</span>
+                      {#if timelineMode(entry)}
+                        <span style="border-radius: 999px; padding: 5px 10px; background: rgba(22, 163, 74, 0.18); color: #166534;">{timelineMode(entry)}</span>
+                      {/if}
+                    </div>
+                    {#if timelineNotes(entry).length}
+                      {#each timelineNotes(entry) as note}
+                        <p style="margin: 0; border-radius: 16px; background: rgba(226, 232, 240, 0.65); padding: 14px; font-size: 13px; line-height: 1.8; color: #475569;">{note}</p>
+                      {/each}
+                    {/if}
+                  </div>
+                </div>
+              {/each}
+            {/if}
+          </div>
+        </section>
+      {/each}
+
+      <footer style="margin-top: 36px; border-radius: 24px; border: 1px solid #e2e8f0; background: #ffffff; padding: 28px; color: #1f2937; box-shadow: 0 18px 40px rgba(100, 116, 139, 0.08);">
+        <h3 style="margin: 0; font-size: 18px; font-weight: 600; color: #0f172a;">继续在线编辑</h3>
+        <p style="margin: 6px 0 0; font-size: 15px; color: #475569;">扫描二维码即可回到行程编辑页面，随时更新计划。</p>
+        <div style="margin-top: 18px; display: flex; flex-direction: column; gap: 14px;">
+          {#if exportQrDataUrl}
+            <img
+              src={exportQrDataUrl}
+              alt="行程二维码"
+              style="width: 120px; height: 120px; border-radius: 18px; border: 1px solid #e2e8f0; background: #ffffff; padding: 10px; box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);"
+            />
+          {/if}
+          <div style="display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: #475569;">
+            <span style="font-weight: 600; color: #0f172a;">行程链接</span>
+            <span style="word-break: break-all; line-height: 1.6;">{exportPageUrl}</span>
+          </div>
+        </div>
+      </footer>
     </div>
   </div>
 {/if}
