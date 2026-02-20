@@ -4,6 +4,8 @@ import type {
   DayItemType,
   DayNote,
   ItineraryDay,
+  MealInfo,
+  ShoppingInfo,
   StayInfo,
   TransportInfo,
   TransportMode
@@ -55,6 +57,24 @@ export function createActivity(): ActivityInfo {
   };
 }
 
+export function createMeal(): MealInfo {
+  return {
+    id: uid('meal_'),
+    name: '',
+    address: '',
+    memo: ''
+  };
+}
+
+export function createShopping(): ShoppingInfo {
+  return {
+    id: uid('shopping_'),
+    name: '',
+    address: '',
+    memo: ''
+  };
+}
+
 export function createNote(): DayNote {
   return {
     id: uid('note_'),
@@ -71,6 +91,12 @@ export function createDayItem(type: DayItemType): DayItem {
   }
   if (type === 'activity') {
     return { id: uid('item_'), type, activity: createActivity() };
+  }
+  if (type === 'meal') {
+    return { id: uid('item_'), type, meal: createMeal() };
+  }
+  if (type === 'shopping') {
+    return { id: uid('item_'), type, shopping: createShopping() };
   }
   return { id: uid('item_'), type, note: createNote() };
 }

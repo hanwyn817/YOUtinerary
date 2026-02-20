@@ -134,6 +134,10 @@ import {
         return summarizeTime(item.stay.checkInTime, item.stay.checkOutTime, ' - ');
       case 'activity':
         return summarizeTime(item.activity.startTime, item.activity.endTime, ' - ');
+      case 'meal':
+        return summarizeTime(item.meal.startTime, item.meal.endTime, ' - ');
+      case 'shopping':
+        return summarizeTime(item.shopping.startTime, item.shopping.endTime, ' - ');
       default:
         return '';
     }

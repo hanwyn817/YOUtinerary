@@ -73,6 +73,8 @@ export const POST: APIRoute = async ({ request, locals }) => {
           transport: 0,
           stay: 0,
           activities: 0,
+          meals: 0,
+          shopping: 0,
           others: 0,
           currency: payload.baseCurrency ?? 'CNY'
         } as Itinerary['totalBudget'])

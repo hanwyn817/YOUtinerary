@@ -4,10 +4,12 @@ export const DAY_ITEM_LABELS: Record<DayItemType, string> = {
   transport: '交通',
   activity: '游玩',
   stay: '住宿',
+  meal: '餐饮',
+  shopping: '购物',
   note: '备注'
 };
 
-export const DAY_ITEM_OPTIONS = (['transport', 'activity', 'stay', 'note'] as DayItemType[]).map(
+export const DAY_ITEM_OPTIONS = (['transport', 'activity', 'stay', 'meal', 'shopping', 'note'] as DayItemType[]).map(
   (value) => ({ value, label: DAY_ITEM_LABELS[value] })
 );
 
@@ -54,6 +56,16 @@ export function summarizeDayItem(item: DayItem): string {
       const parts = [activity.name?.trim() || '未填', activity.address?.trim()].filter(Boolean);
       return parts.join(' · ') || '未填';
     }
+    case 'meal': {
+      const meal = item.meal;
+      const parts = [meal.name?.trim() || '未填', meal.address?.trim()].filter(Boolean);
+      return parts.join(' · ') || '未填';
+    }
+    case 'shopping': {
+      const shopping = item.shopping;
+      const parts = [shopping.name?.trim() || '未填', shopping.address?.trim()].filter(Boolean);
+      return parts.join(' · ') || '未填';
+    }
     case 'note':
     default: {
       const noteText = item.note.text.trim();
@@ -85,6 +97,10 @@ export function extractCostDisplay(item: DayItem, fallbackCurrency = 'CNY'): str
         ? item.stay.cost
         : item.type === 'activity'
           ? item.activity.cost
+          : item.type === 'meal'
+            ? item.meal.cost
+            : item.type === 'shopping'
+              ? item.shopping.cost
           : undefined;
   if (!cost) return '';
   const { amount, currency } = cost;

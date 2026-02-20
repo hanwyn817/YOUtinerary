@@ -6,6 +6,8 @@ import type {
   Itinerary,
   ItineraryDay,
   ItineraryMeta,
+  MealInfo,
+  ShoppingInfo,
   StayInfo,
   TransportInfo
 } from '../../lib/types';
@@ -246,6 +248,32 @@ function ensureActivity(activity: Partial<ActivityInfo> | undefined): ActivityIn
   };
 }
 
+function ensureMeal(meal: Partial<MealInfo> | undefined): MealInfo {
+  return {
+    id: meal?.id ?? randomId('meal_'),
+    name: meal?.name ?? '',
+    address: meal?.address ?? '',
+    startTime: meal?.startTime,
+    endTime: meal?.endTime,
+    cost: meal?.cost,
+    memo: meal?.memo ?? '',
+    location: meal?.location
+  };
+}
+
+function ensureShopping(shopping: Partial<ShoppingInfo> | undefined): ShoppingInfo {
+  return {
+    id: shopping?.id ?? randomId('shopping_'),
+    name: shopping?.name ?? '',
+    address: shopping?.address ?? '',
+    startTime: shopping?.startTime,
+    endTime: shopping?.endTime,
+    cost: shopping?.cost,
+    memo: shopping?.memo ?? '',
+    location: shopping?.location
+  };
+}
+
 function ensureNote(note: Partial<DayNote> | undefined): DayNote {
   return {
     id: note?.id ?? randomId('note_'),
@@ -263,6 +291,12 @@ function normalizeItem(item: any, fallbackType: DayItemType = 'note'): DayItem {
   }
   if (type === 'activity') {
     return { id: item?.id ?? randomId('item_'), type, activity: ensureActivity(item?.activity ?? item) };
+  }
+  if (type === 'meal') {
+    return { id: item?.id ?? randomId('item_'), type, meal: ensureMeal(item?.meal ?? item) };
+  }
+  if (type === 'shopping') {
+    return { id: item?.id ?? randomId('item_'), type, shopping: ensureShopping(item?.shopping ?? item) };
   }
   return { id: item?.id ?? randomId('item_'), type: 'note', note: ensureNote(item?.note ?? item) };
 }
@@ -286,6 +320,16 @@ function normalizeDay(raw: any, index: number): ItineraryDay {
       items.push({ id: randomId('item_'), type: 'activity', activity: ensureActivity(entry) });
     }
   }
+  if (Array.isArray(raw?.meals)) {
+    for (const entry of raw.meals) {
+      items.push({ id: randomId('item_'), type: 'meal', meal: ensureMeal(entry) });
+    }
+  }
+  if (Array.isArray(raw?.shopping)) {
+    for (const entry of raw.shopping) {
+      items.push({ id: randomId('item_'), type: 'shopping', shopping: ensureShopping(entry) });
+    }
+  }
   if (Array.isArray(raw?.stays)) {
     for (const entry of raw.stays) {
       items.push({ id: randomId('item_'), type: 'stay', stay: ensureStay(entry) });
@@ -300,10 +344,26 @@ function normalizeDay(raw: any, index: number): ItineraryDay {
   return { id, label, date: raw?.date, items };
 }
 
+function toFiniteNumber(value: unknown): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function normalizeItinerary(raw: any): Itinerary {
   const base = raw ?? {};
   const daysSource = Array.isArray(base.days) ? base.days : [];
   const normalizedDays = daysSource.map((day: any, index: number) => normalizeDay(day, index));
+  const normalizedBudget = base.totalBudget
+    ? {
+        transport: toFiniteNumber(base.totalBudget.transport),
+        stay: toFiniteNumber(base.totalBudget.stay),
+        activities: toFiniteNumber(base.totalBudget.activities),
+        meals: toFiniteNumber(base.totalBudget.meals),
+        shopping: toFiniteNumber(base.totalBudget.shopping),
+        others: toFiniteNumber(base.totalBudget.others),
+        currency: base.totalBudget.currency ?? base.baseCurrency ?? 'CNY'
+      }
+    : undefined;
   return {
     ...base,
     id: base.id ?? generateId('trip'),
@@ -312,7 +372,8 @@ export function normalizeItinerary(raw: any): Itinerary {
     createdAt: base.createdAt ?? new Date().toISOString(),
     updatedAt: base.updatedAt ?? new Date().toISOString(),
     tags: Array.isArray(base.tags) ? base.tags : [],
-    days: normalizedDays
+    days: normalizedDays,
+    totalBudget: normalizedBudget
   } as Itinerary;
 }
 

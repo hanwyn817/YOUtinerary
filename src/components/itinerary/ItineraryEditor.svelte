@@ -61,6 +61,8 @@
         transport: 0,
         stay: 0,
         activities: 0,
+        meals: 0,
+        shopping: 0,
         others: 0,
         currency: 'CNY'
       }

@@ -67,17 +67,41 @@ export interface ActivityInfo {
   location?: LocationPoint;
 }
 
+export interface MealInfo {
+  id: string;
+  name: string;
+  address: string;
+  startTime?: string;
+  endTime?: string;
+  cost?: Money;
+  memo?: string;
+  location?: LocationPoint;
+}
+
+export interface ShoppingInfo {
+  id: string;
+  name: string;
+  address: string;
+  startTime?: string;
+  endTime?: string;
+  cost?: Money;
+  memo?: string;
+  location?: LocationPoint;
+}
+
 export interface DayNote {
   id: string;
   text: string;
 }
 
-export type DayItemType = 'transport' | 'stay' | 'activity' | 'note';
+export type DayItemType = 'transport' | 'stay' | 'activity' | 'meal' | 'shopping' | 'note';
 
 export type DayItem =
   | { id: string; type: 'transport'; transport: TransportInfo }
   | { id: string; type: 'stay'; stay: StayInfo }
   | { id: string; type: 'activity'; activity: ActivityInfo }
+  | { id: string; type: 'meal'; meal: MealInfo }
+  | { id: string; type: 'shopping'; shopping: ShoppingInfo }
   | { id: string; type: 'note'; note: DayNote };
 
 export interface ItineraryDay {
@@ -91,6 +115,8 @@ export interface CostSummary {
   transport: number;
   stay: number;
   activities: number;
+  meals: number;
+  shopping: number;
   others: number;
   currency: CurrencyCode;
 }
@@ -150,4 +176,6 @@ export type EditableEntity =
   | { kind: 'transport'; dayId: string; itemId: string }
   | { kind: 'stay'; dayId: string; itemId: string }
   | { kind: 'activity'; dayId: string; itemId: string }
+  | { kind: 'meal'; dayId: string; itemId: string }
+  | { kind: 'shopping'; dayId: string; itemId: string }
   | { kind: 'note'; dayId: string; itemId: string };

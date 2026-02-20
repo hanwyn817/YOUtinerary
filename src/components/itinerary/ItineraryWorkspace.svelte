@@ -42,7 +42,7 @@ import {
   const apiCurrencySet = new Set<CurrencyCode>(apiCurrencyOptions);
 
   type TransportItem = Extract<DayItem, { type: 'transport' }>;
-  type BudgetCategory = 'transport' | 'stay' | 'activities';
+  type BudgetCategory = 'transport' | 'stay' | 'activities' | 'meals' | 'shopping';
 
   interface CostEntry {
     dayId: string;
@@ -55,6 +55,8 @@ import {
     transport: number;
     stay: number;
     activities: number;
+    meals: number;
+    shopping: number;
     others: number;
     total: number;
     currency: CurrencyCode;
@@ -81,6 +83,8 @@ import {
     transport: 0,
     stay: 0,
     activities: 0,
+    meals: 0,
+    shopping: 0,
     others: 0,
     total: 0,
     currency: 'CNY'
@@ -183,6 +187,28 @@ import {
             amount,
             currency: item.activity.cost?.currency ?? fallbackCurrency
           });
+          return;
+        }
+        if (item.type === 'meal') {
+          const amount = item.meal.cost?.amount;
+          if (!amount || Number.isNaN(amount)) return;
+          entries.push({
+            dayId: day.id,
+            category: 'meals',
+            amount,
+            currency: item.meal.cost?.currency ?? fallbackCurrency
+          });
+          return;
+        }
+        if (item.type === 'shopping') {
+          const amount = item.shopping.cost?.amount;
+          if (!amount || Number.isNaN(amount)) return;
+          entries.push({
+            dayId: day.id,
+            category: 'shopping',
+            amount,
+            currency: item.shopping.cost?.currency ?? fallbackCurrency
+          });
         }
       });
     });
@@ -200,6 +226,10 @@ import {
               ? item.stay.cost?.amount
               : item.type === 'activity'
                 ? item.activity.cost?.amount
+                : item.type === 'meal'
+                  ? item.meal.cost?.amount
+                  : item.type === 'shopping'
+                    ? item.shopping.cost?.amount
                 : undefined;
         if (!amount || Number.isNaN(amount)) return total;
         return total + amount;
@@ -213,13 +243,17 @@ import {
     const transport = itinerary.totalBudget?.transport ?? 0;
     const stay = itinerary.totalBudget?.stay ?? 0;
     const activities = itinerary.totalBudget?.activities ?? 0;
+    const meals = itinerary.totalBudget?.meals ?? 0;
+    const shopping = itinerary.totalBudget?.shopping ?? 0;
     const others = itinerary.totalBudget?.others ?? 0;
     return {
       transport: roundAmount(transport),
       stay: roundAmount(stay),
       activities: roundAmount(activities),
+      meals: roundAmount(meals),
+      shopping: roundAmount(shopping),
       others: roundAmount(others),
-      total: roundAmount(transport + stay + activities + others),
+      total: roundAmount(transport + stay + activities + meals + shopping + others),
       currency
     };
   }
@@ -284,7 +318,9 @@ import {
       const categoryTotals: Record<BudgetCategory, number> = {
         transport: 0,
         stay: 0,
-        activities: 0
+        activities: 0,
+        meals: 0,
+        shopping: 0
       };
       const dayTotals: Record<string, number> = {};
       snapshot.days.forEach((day) => {
@@ -328,8 +364,17 @@ import {
         transport: roundAmount(categoryTotals.transport),
         stay: roundAmount(categoryTotals.stay),
         activities: roundAmount(categoryTotals.activities),
+        meals: roundAmount(categoryTotals.meals),
+        shopping: roundAmount(categoryTotals.shopping),
         others: roundAmount(others),
-        total: roundAmount(categoryTotals.transport + categoryTotals.stay + categoryTotals.activities + others),
+        total: roundAmount(
+          categoryTotals.transport +
+            categoryTotals.stay +
+            categoryTotals.activities +
+            categoryTotals.meals +
+            categoryTotals.shopping +
+            others
+        ),
         currency: baseCurrency
       };
       dayCostInBaseCurrency = Object.fromEntries(
@@ -360,7 +405,7 @@ import {
     }
   }
 
-  type LocationEntity = 'transport-from' | 'transport-to' | 'stay' | 'activity';
+  type LocationEntity = 'transport-from' | 'transport-to' | 'stay' | 'activity' | 'meal' | 'shopping';
 
   interface LocationRequestPayload {
     entity: LocationEntity;
@@ -455,6 +500,8 @@ import {
     let transport = 0;
     let stay = 0;
     let activities = 0;
+    let meals = 0;
+    let shopping = 0;
     draft.days.forEach((day) => {
       day.items.forEach((item) => {
         const amount =
@@ -464,11 +511,17 @@ import {
               ? item.stay.cost?.amount
               : item.type === 'activity'
                 ? item.activity.cost?.amount
+                : item.type === 'meal'
+                  ? item.meal.cost?.amount
+                  : item.type === 'shopping'
+                    ? item.shopping.cost?.amount
                 : undefined;
         if (amount && !Number.isNaN(amount)) {
           if (item.type === 'transport') transport += amount;
           if (item.type === 'stay') stay += amount;
           if (item.type === 'activity') activities += amount;
+          if (item.type === 'meal') meals += amount;
+          if (item.type === 'shopping') shopping += amount;
         }
       });
     });
@@ -480,6 +533,8 @@ import {
         transport,
         stay,
         activities,
+        meals,
+        shopping,
         others,
         currency
       }
@@ -633,6 +688,16 @@ import {
         entry.activity.address = detail.location.address ?? entry.activity.address;
         entry.activity.location = detail.location;
       }
+      if (entry.type === 'meal' && detail.entity === 'meal') {
+        entry.meal.name = detail.location.name;
+        entry.meal.address = detail.location.address ?? entry.meal.address;
+        entry.meal.location = detail.location;
+      }
+      if (entry.type === 'shopping' && detail.entity === 'shopping') {
+        entry.shopping.name = detail.location.name;
+        entry.shopping.address = detail.location.address ?? entry.shopping.address;
+        entry.shopping.location = detail.location;
+      }
       return entry;
     });
   }
@@ -752,6 +817,10 @@ import {
         return summarizeTime(item.stay.checkInTime, item.stay.checkOutTime, ' - ');
       case 'activity':
         return summarizeTime(item.activity.startTime, item.activity.endTime, ' - ');
+      case 'meal':
+        return summarizeTime(item.meal.startTime, item.meal.endTime, ' - ');
+      case 'shopping':
+        return summarizeTime(item.shopping.startTime, item.shopping.endTime, ' - ');
       default:
         return '';
     }
@@ -781,6 +850,12 @@ import {
     if (item.type === 'activity') {
       return [item.activity.memo?.trim()].filter(Boolean) as string[];
     }
+    if (item.type === 'meal') {
+      return [item.meal.memo?.trim()].filter(Boolean) as string[];
+    }
+    if (item.type === 'shopping') {
+      return [item.shopping.memo?.trim()].filter(Boolean) as string[];
+    }
     return [];
   }
 
@@ -793,6 +868,10 @@ import {
             ? item.stay.cost?.amount
             : item.type === 'activity'
               ? item.activity.cost?.amount
+              : item.type === 'meal'
+                ? item.meal.cost?.amount
+                : item.type === 'shopping'
+                  ? item.shopping.cost?.amount
               : undefined;
       if (!amount || Number.isNaN(amount)) return total;
       return total + amount;
@@ -953,7 +1032,7 @@ import {
           </div>
         </div>
       {/if}
-      <div class="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+      <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
           <span class="text-xs text-slate-500">交通</span>
           <span class="text-base font-semibold text-slate-700">{formatAmount(displayBudget.transport)}{displayBudget.currency}</span>
@@ -965,6 +1044,14 @@ import {
         <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
           <span class="text-xs text-slate-500">游玩</span>
           <span class="text-base font-semibold text-slate-700">{formatAmount(displayBudget.activities)}{displayBudget.currency}</span>
+        </div>
+        <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
+          <span class="text-xs text-slate-500">餐饮</span>
+          <span class="text-base font-semibold text-slate-700">{formatAmount(displayBudget.meals)}{displayBudget.currency}</span>
+        </div>
+        <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
+          <span class="text-xs text-slate-500">购物</span>
+          <span class="text-base font-semibold text-slate-700">{formatAmount(displayBudget.shopping)}{displayBudget.currency}</span>
         </div>
         <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
           <span class="text-xs text-slate-500">其他</span>
@@ -1109,7 +1196,7 @@ import {
 
             <div class="mt-4 flex flex-col gap-4">
               {#if day.items.length === 0}
-                <p class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">暂无安排，添加一条交通 / 住宿 / 游玩记录开始吧。</p>
+                <p class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">暂无安排，添加一条交通 / 住宿 / 游玩 / 餐饮 / 购物记录开始吧。</p>
               {/if}
               {#each day.items as entry, index}
                 <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -1323,7 +1410,7 @@ import {
                         />
                       </label>
                     </div>
-                    <div class="grid gap-3 md:grid-cols-3">
+                    <div class="grid gap-3 md:grid-cols-4">
                       <label class="flex flex-col gap-1 text-xs text-slate-600">
                         入住时间
                         <input
@@ -1405,7 +1492,7 @@ import {
                         />
                       </label>
                     </div>
-                    <div class="grid gap-3 md:grid-cols-3">
+                    <div class="grid gap-3 md:grid-cols-4">
                       <label class="flex flex-col gap-1 text-xs text-slate-600">
                         开始时间
                         <input
@@ -1433,12 +1520,30 @@ import {
                           value={entry.activity.cost?.amount ?? ''}
                           on:input={(event) => {
                             const amount = Number((event.target as HTMLInputElement).value || 0);
-                            const currency = entry.activity.cost?.currency ?? draft?.baseCurrency ?? 'CNY';
+                            const currency = entry.activity.cost?.currency ?? 'CNY';
                             entry.activity.cost = { amount, currency };
                             recalcBudget();
                             markDirty();
                           }}
                         />
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        费用货币
+                        <select
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          value={entry.activity.cost?.currency ?? 'CNY'}
+                          on:change={(event) => {
+                            const currency = (event.target as HTMLSelectElement).value;
+                            const amount = entry.activity.cost?.amount ?? 0;
+                            entry.activity.cost = { amount, currency };
+                            recalcBudget();
+                            markDirty();
+                          }}
+                        >
+                          {#each currencyOptions as option}
+                            <option value={option}>{option}</option>
+                          {/each}
+                        </select>
                       </label>
                     </div>
                     <label class="flex flex-col gap-1 text-xs text-slate-600">
@@ -1446,6 +1551,206 @@ import {
                       <textarea
                         class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
                         bind:value={entry.activity.memo}
+                        rows={2}
+                        on:input={markDirty}
+                      />
+                    </label>
+                  </div>
+                {:else if entry.type === 'meal'}
+                  <div class="mt-3 flex flex-col gap-3">
+                    <div class="grid gap-3 md:grid-cols-2">
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        餐饮地点
+                        <div class="flex gap-2">
+                          <input
+                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                            bind:value={entry.meal.name}
+                            on:input={markDirty}
+                          />
+                          <button
+                            type="button"
+                            class="whitespace-nowrap rounded-full border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
+                            on:click={() =>
+                              openLocationPicker({
+                                entity: 'meal',
+                                dayId: day.id,
+                                itemId: entry.id,
+                                existing: entry.meal.location
+                              })
+                            }
+                          >
+                            选地点
+                          </button>
+                        </div>
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        地址
+                        <input
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          bind:value={entry.meal.address}
+                          on:input={markDirty}
+                        />
+                      </label>
+                    </div>
+                    <div class="grid gap-3 md:grid-cols-4">
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        开始时间
+                        <input
+                          type="time"
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          bind:value={entry.meal.startTime}
+                          on:change={markDirty}
+                        />
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        结束时间
+                        <input
+                          type="time"
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          bind:value={entry.meal.endTime}
+                          on:change={markDirty}
+                        />
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        费用
+                        <input
+                          type="number"
+                          min="0"
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          value={entry.meal.cost?.amount ?? ''}
+                          on:input={(event) => {
+                            const amount = Number((event.target as HTMLInputElement).value || 0);
+                            const currency = entry.meal.cost?.currency ?? 'CNY';
+                            entry.meal.cost = { amount, currency };
+                            recalcBudget();
+                            markDirty();
+                          }}
+                        />
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        费用货币
+                        <select
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          value={entry.meal.cost?.currency ?? 'CNY'}
+                          on:change={(event) => {
+                            const currency = (event.target as HTMLSelectElement).value;
+                            const amount = entry.meal.cost?.amount ?? 0;
+                            entry.meal.cost = { amount, currency };
+                            recalcBudget();
+                            markDirty();
+                          }}
+                        >
+                          {#each currencyOptions as option}
+                            <option value={option}>{option}</option>
+                          {/each}
+                        </select>
+                      </label>
+                    </div>
+                    <label class="flex flex-col gap-1 text-xs text-slate-600">
+                      备注
+                      <textarea
+                        class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                        bind:value={entry.meal.memo}
+                        rows={2}
+                        on:input={markDirty}
+                      />
+                    </label>
+                  </div>
+                {:else if entry.type === 'shopping'}
+                  <div class="mt-3 flex flex-col gap-3">
+                    <div class="grid gap-3 md:grid-cols-2">
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        购物地点
+                        <div class="flex gap-2">
+                          <input
+                            class="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                            bind:value={entry.shopping.name}
+                            on:input={markDirty}
+                          />
+                          <button
+                            type="button"
+                            class="whitespace-nowrap rounded-full border border-slate-300 px-3 py-2 text-xs text-slate-600 hover:border-sky-300 hover:text-sky-500"
+                            on:click={() =>
+                              openLocationPicker({
+                                entity: 'shopping',
+                                dayId: day.id,
+                                itemId: entry.id,
+                                existing: entry.shopping.location
+                              })
+                            }
+                          >
+                            选地点
+                          </button>
+                        </div>
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        地址
+                        <input
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          bind:value={entry.shopping.address}
+                          on:input={markDirty}
+                        />
+                      </label>
+                    </div>
+                    <div class="grid gap-3 md:grid-cols-4">
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        开始时间
+                        <input
+                          type="time"
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          bind:value={entry.shopping.startTime}
+                          on:change={markDirty}
+                        />
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        结束时间
+                        <input
+                          type="time"
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          bind:value={entry.shopping.endTime}
+                          on:change={markDirty}
+                        />
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        费用
+                        <input
+                          type="number"
+                          min="0"
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          value={entry.shopping.cost?.amount ?? ''}
+                          on:input={(event) => {
+                            const amount = Number((event.target as HTMLInputElement).value || 0);
+                            const currency = entry.shopping.cost?.currency ?? 'CNY';
+                            entry.shopping.cost = { amount, currency };
+                            recalcBudget();
+                            markDirty();
+                          }}
+                        />
+                      </label>
+                      <label class="flex flex-col gap-1 text-xs text-slate-600">
+                        费用货币
+                        <select
+                          class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                          value={entry.shopping.cost?.currency ?? 'CNY'}
+                          on:change={(event) => {
+                            const currency = (event.target as HTMLSelectElement).value;
+                            const amount = entry.shopping.cost?.amount ?? 0;
+                            entry.shopping.cost = { amount, currency };
+                            recalcBudget();
+                            markDirty();
+                          }}
+                        >
+                          {#each currencyOptions as option}
+                            <option value={option}>{option}</option>
+                          {/each}
+                        </select>
+                      </label>
+                    </div>
+                    <label class="flex flex-col gap-1 text-xs text-slate-600">
+                      备注
+                      <textarea
+                        class="rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-700 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                        bind:value={entry.shopping.memo}
                         rows={2}
                         on:input={markDirty}
                       />
