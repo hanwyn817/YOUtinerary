@@ -25,7 +25,6 @@ import {
   const transportOptions: { value: TransportMode; label: string }[] = [
     { value: 'plane', label: '飞机' },
     { value: 'train', label: '火车' },
-    { value: 'high-speed-rail', label: '高铁/城际' },
     { value: 'bus', label: '长途/大巴' },
     { value: 'subway', label: '地铁' },
     { value: 'car', label: '自驾/租车' },
@@ -129,7 +128,15 @@ import {
   }
 
   function relabelDays(days: ItineraryDay[]): ItineraryDay[] {
-    return days.map((day, index) => ({ ...day, label: `第${index + 1}天` }));
+    return days.map((day, index) => ({
+      ...day,
+      label: `第${index + 1}天`,
+      items: day.items.map((item) =>
+        item.type === 'transport' && item.transport.mode === 'high-speed-rail'
+          ? { ...item, transport: { ...item.transport, mode: 'train' } }
+          : item
+      )
+    }));
   }
 
   function getBaseCurrency(itinerary: Itinerary): CurrencyCode {

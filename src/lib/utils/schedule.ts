@@ -20,7 +20,7 @@ export function getDayItemLabel(type: DayItemType): string {
 const TRANSPORT_MODE_LABELS: Record<TransportMode, string> = {
   plane: '飞机',
   train: '火车',
-  'high-speed-rail': '高铁/城际',
+  'high-speed-rail': '火车',
   bus: '长途/大巴',
   subway: '地铁',
   car: '自驾/租车',
