@@ -24,7 +24,7 @@
 ├── src/pages/api/           # Cloudflare Pages Functions（Astro API Routes）
 ├── public/                  # 静态资源
 ├── wrangler.toml            # Cloudflare KV & 变量绑定示例
-├── .env.example             # 本地调试所需环境变量示例
+├── .dev.vars.example        # 本地调试所需环境变量示例
 └── package.json
 ```
 
@@ -40,7 +40,7 @@ npm run dev:pages    # 先 build，再通过 wrangler pages dev 调起 Functions
 
 1. 安装 Wrangler CLI（已作为 devDependency）。
 2. 本地创建 KV namespace，并将 namespace ID 写入 `wrangler.toml` 或通过 CLI 传参。
-3. 准备 `.env`（可复制 `.env.example`）/ `.dev.vars` 并配置 `DEFAULT_PASSWORD`、`GAODE_REST_KEY` 等变量（Pages Dev 默认读取 `.dev.vars`）。
+3. 准备 `.dev.vars`（可复制 `.dev.vars.example`）并配置 `DEFAULT_PASSWORD`、`GAODE_REST_KEY`、`FIXER_ACCESS_KEY` 等变量（Pages Dev 默认读取 `.dev.vars`）。
 4. 运行 Pages Dev 时需绑定三个 KV：`ITINERARIES`、`SETTINGS`、`SESSION`，脚本中已包含 `--kv` 参数。
 
 ## 🔐 初始化密码
@@ -58,12 +58,19 @@ npm run dev:pages    # 先 build，再通过 wrangler pages dev 调起 Functions
 
 前端可在交通条目中根据地点信息调用该接口，获得路线时长、费用预估等，随后写入交通备注。
 
+## 💱 汇率换算代理
+
+- API 位置：`src/pages/api/exchange/convert.ts`
+- 请求参数：`from`、`to`、`amount`
+- 代理要求：已解锁编辑权限的用户才能调用，防止滥用
+- 需在 Cloudflare 环境变量中设置 `FIXER_ACCESS_KEY`
+
 ## 📄 部署到 Cloudflare Pages
 
 1. 构建：`npm run build`
 2. Cloudflare Pages 控制台中新建项目，构建命令填写 `npm run build`，输出目录 `dist/`。
 3. 在 **Settings → Functions** 中绑定 KV 名称空间：`ITINERARIES`（存行程）、`SETTINGS`（存密码哈希等配置）、`SESSION`（存登录会话，建议单独创建）。
-4. 在 **Settings → Environment variables** 为生产/预览环境添加：`GAODE_REST_KEY`、`SESSION_TTL_SECONDS`（默认 28800 秒，可按需调整）、`DEFAULT_PASSWORD`（可选，用于首次初始化）。
+4. 在 **Settings → Environment variables** 为生产/预览环境添加：`GAODE_REST_KEY`、`FIXER_ACCESS_KEY`、`SESSION_TTL_SECONDS`（默认 28800 秒，可按需调整）、`DEFAULT_PASSWORD`（可选，用于首次初始化）。
 5. 触发部署，首次进入站点时使用密码解锁即可开始编辑。
 
 ## 🧪 下一步可拓展方向

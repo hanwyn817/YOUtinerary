@@ -1,7 +1,9 @@
 <script lang="ts">
 import { onMount, tick } from 'svelte';
   import { itineraryStore } from '../../lib/stores/itineraries';
+import { convertCurrency } from '../../lib/api/client';
   import type {
+    CurrencyCode,
     DayItem,
     DayItemType,
     Itinerary,
@@ -36,8 +38,33 @@ import {
   ];
 
   const currencyOptions = ['CNY', 'JPY', 'USD', 'HKD', 'EUR', 'GBP', 'AUD', 'TWD', 'KRW', 'THB', 'OTHER'];
+  const apiCurrencyOptions: CurrencyCode[] = ['CNY', 'JPY', 'USD', 'HKD', 'EUR', 'GBP', 'AUD', 'TWD', 'KRW', 'THB'];
+  const apiCurrencySet = new Set<CurrencyCode>(apiCurrencyOptions);
 
   type TransportItem = Extract<DayItem, { type: 'transport' }>;
+  type BudgetCategory = 'transport' | 'stay' | 'activities';
+
+  interface CostEntry {
+    dayId: string;
+    category: BudgetCategory;
+    amount: number;
+    currency: CurrencyCode;
+  }
+
+  interface DisplayBudget {
+    transport: number;
+    stay: number;
+    activities: number;
+    others: number;
+    total: number;
+    currency: CurrencyCode;
+  }
+
+  interface ConversionRateDetail {
+    from: CurrencyCode;
+    to: CurrencyCode;
+    rate: number;
+  }
 
   let draft: Itinerary | null = null;
   let dirty = false;
@@ -50,6 +77,22 @@ import {
   let confirmingDelete = false;
   let deleting = false;
   let deleteError: string | null = null;
+  let displayBudget: DisplayBudget = {
+    transport: 0,
+    stay: 0,
+    activities: 0,
+    others: 0,
+    total: 0,
+    currency: 'CNY'
+  };
+  let dayCostInBaseCurrency: Record<string, number> = {};
+  let convertingBudget = false;
+  let budgetConversionWarning = '';
+  let budgetConversionErrors: string[] = [];
+  let usedConversionRates: ConversionRateDetail[] = [];
+  let conversionJobId = 0;
+  const fxRateCache = new Map<string, number>();
+  const fxRateInFlight = new Map<string, Promise<number>>();
 
   $: state = $itineraryStore;
 
@@ -59,6 +102,13 @@ import {
     if (!draft.baseCurrency) {
       draft.baseCurrency = 'CNY';
     }
+    displayBudget = fallbackDisplayBudget(draft);
+    dayCostInBaseCurrency = Object.fromEntries(
+      Object.entries(collectRawDayCosts(draft)).map(([dayId, amount]) => [dayId, roundAmount(amount)])
+    );
+    budgetConversionWarning = '';
+    budgetConversionErrors = [];
+    usedConversionRates = [];
     recalcBudget();
     dirty = false;
   }
@@ -76,6 +126,238 @@ import {
 
   function relabelDays(days: ItineraryDay[]): ItineraryDay[] {
     return days.map((day, index) => ({ ...day, label: `第${index + 1}天` }));
+  }
+
+  function getBaseCurrency(itinerary: Itinerary): CurrencyCode {
+    return itinerary.baseCurrency ?? itinerary.totalBudget?.currency ?? 'CNY';
+  }
+
+  function roundAmount(value: number): number {
+    if (!Number.isFinite(value)) return 0;
+    return Math.round(value * 100) / 100;
+  }
+
+  function formatAmount(value: number): string {
+    const rounded = roundAmount(value);
+    return Number.isInteger(rounded) ? String(rounded) : String(rounded.toFixed(2)).replace(/\.?0+$/, '');
+  }
+
+  function formatRate(value: number): string {
+    if (!Number.isFinite(value)) return '0';
+    return value.toFixed(6).replace(/\.?0+$/, '');
+  }
+
+  function collectCostEntries(itinerary: Itinerary): CostEntry[] {
+    const fallbackCurrency = getBaseCurrency(itinerary);
+    const entries: CostEntry[] = [];
+    itinerary.days.forEach((day) => {
+      day.items.forEach((item) => {
+        if (item.type === 'transport') {
+          const amount = item.transport.cost?.amount;
+          if (!amount || Number.isNaN(amount)) return;
+          entries.push({
+            dayId: day.id,
+            category: 'transport',
+            amount,
+            currency: item.transport.cost?.currency ?? fallbackCurrency
+          });
+          return;
+        }
+        if (item.type === 'stay') {
+          const amount = item.stay.cost?.amount;
+          if (!amount || Number.isNaN(amount)) return;
+          entries.push({
+            dayId: day.id,
+            category: 'stay',
+            amount,
+            currency: item.stay.cost?.currency ?? fallbackCurrency
+          });
+          return;
+        }
+        if (item.type === 'activity') {
+          const amount = item.activity.cost?.amount;
+          if (!amount || Number.isNaN(amount)) return;
+          entries.push({
+            dayId: day.id,
+            category: 'activities',
+            amount,
+            currency: item.activity.cost?.currency ?? fallbackCurrency
+          });
+        }
+      });
+    });
+    return entries;
+  }
+
+  function collectRawDayCosts(itinerary: Itinerary): Record<string, number> {
+    const result: Record<string, number> = {};
+    itinerary.days.forEach((day) => {
+      result[day.id] = day.items.reduce((total, item) => {
+        const amount =
+          item.type === 'transport'
+            ? item.transport.cost?.amount
+            : item.type === 'stay'
+              ? item.stay.cost?.amount
+              : item.type === 'activity'
+                ? item.activity.cost?.amount
+                : undefined;
+        if (!amount || Number.isNaN(amount)) return total;
+        return total + amount;
+      }, 0);
+    });
+    return result;
+  }
+
+  function fallbackDisplayBudget(itinerary: Itinerary): DisplayBudget {
+    const currency = getBaseCurrency(itinerary);
+    const transport = itinerary.totalBudget?.transport ?? 0;
+    const stay = itinerary.totalBudget?.stay ?? 0;
+    const activities = itinerary.totalBudget?.activities ?? 0;
+    const others = itinerary.totalBudget?.others ?? 0;
+    return {
+      transport: roundAmount(transport),
+      stay: roundAmount(stay),
+      activities: roundAmount(activities),
+      others: roundAmount(others),
+      total: roundAmount(transport + stay + activities + others),
+      currency
+    };
+  }
+
+  async function getRateToCurrency(from: CurrencyCode, to: CurrencyCode): Promise<number> {
+    if (from === to) return 1;
+    if (!apiCurrencySet.has(from) || !apiCurrencySet.has(to)) {
+      throw new Error(`不支持币种换算（${from}->${to}）`);
+    }
+    const rateKey = `${from}_${to}`;
+    const cachedRate = fxRateCache.get(rateKey);
+    if (typeof cachedRate === 'number') {
+      return cachedRate;
+    }
+    let ratePromise = fxRateInFlight.get(rateKey);
+    if (!ratePromise) {
+      ratePromise = convertCurrency({
+        from,
+        to,
+        amount: 1
+      })
+        .then((converted) => {
+          const rate = Number(converted.result);
+          if (!Number.isFinite(rate) || rate <= 0) {
+            throw new Error('无效汇率返回');
+          }
+          fxRateCache.set(rateKey, rate);
+          return rate;
+        })
+        .finally(() => {
+          fxRateInFlight.delete(rateKey);
+        });
+      fxRateInFlight.set(rateKey, ratePromise);
+    }
+    return await ratePromise;
+  }
+
+  async function convertAmountToCurrency(amount: number, from: CurrencyCode, to: CurrencyCode): Promise<number> {
+    if (!amount || Number.isNaN(amount)) return 0;
+    const rate = await getRateToCurrency(from, to);
+    return amount * rate;
+  }
+
+  function errorMessage(error: unknown): string {
+    if (error instanceof Error && error.message) return error.message;
+    return '未知错误';
+  }
+
+  async function refreshConvertedBudget() {
+    if (!draft) return;
+    const snapshot = cloneValue(draft);
+    const baseCurrency = getBaseCurrency(snapshot);
+    const entries = collectCostEntries(snapshot);
+    const rawDayCosts = collectRawDayCosts(snapshot);
+    const fallbackBudget = fallbackDisplayBudget(snapshot);
+    const dayLabelMap = new Map(snapshot.days.map((day) => [day.id, day.label]));
+    const jobId = ++conversionJobId;
+    convertingBudget = true;
+    budgetConversionWarning = '';
+    budgetConversionErrors = [];
+    try {
+      const categoryTotals: Record<BudgetCategory, number> = {
+        transport: 0,
+        stay: 0,
+        activities: 0
+      };
+      const dayTotals: Record<string, number> = {};
+      snapshot.days.forEach((day) => {
+        dayTotals[day.id] = 0;
+      });
+
+      let hasFallback = false;
+      const conversionErrors: string[] = [];
+      const usedRateMap = new Map<string, ConversionRateDetail>();
+      await Promise.all(
+        entries.map(async (entry) => {
+          let amountInBase = entry.amount;
+          try {
+            amountInBase = await convertAmountToCurrency(entry.amount, entry.currency, baseCurrency);
+            if (entry.currency !== baseCurrency) {
+              const rate = await getRateToCurrency(entry.currency, baseCurrency);
+              const key = `${entry.currency}_${baseCurrency}`;
+              usedRateMap.set(key, {
+                from: entry.currency,
+                to: baseCurrency,
+                rate
+              });
+            }
+          } catch (error) {
+            console.error('currency convert failed', error);
+            hasFallback = true;
+            const dayLabel = dayLabelMap.get(entry.dayId) ?? entry.dayId;
+            conversionErrors.push(
+              `${dayLabel} ${entry.category} ${entry.currency}->${baseCurrency}: ${errorMessage(error)}`
+            );
+          }
+          categoryTotals[entry.category] += amountInBase;
+          dayTotals[entry.dayId] = (dayTotals[entry.dayId] ?? 0) + amountInBase;
+        })
+      );
+
+      if (jobId !== conversionJobId) return;
+
+      const others = snapshot.totalBudget?.others ?? 0;
+      displayBudget = {
+        transport: roundAmount(categoryTotals.transport),
+        stay: roundAmount(categoryTotals.stay),
+        activities: roundAmount(categoryTotals.activities),
+        others: roundAmount(others),
+        total: roundAmount(categoryTotals.transport + categoryTotals.stay + categoryTotals.activities + others),
+        currency: baseCurrency
+      };
+      dayCostInBaseCurrency = Object.fromEntries(
+        Object.entries(entries.length ? dayTotals : rawDayCosts).map(([dayId, amount]) => [dayId, roundAmount(amount)])
+      );
+      usedConversionRates = Array.from(usedRateMap.values()).sort((a, b) => a.from.localeCompare(b.from));
+      budgetConversionErrors = conversionErrors;
+      budgetConversionWarning = hasFallback
+        ? `部分币种换算失败（${conversionErrors.length}项），暂按原金额计入。`
+        : '';
+      if (conversionErrors.length) {
+        console.error('budget conversion details', conversionErrors);
+      }
+    } catch (error) {
+      console.error('refreshConvertedBudget failed', error);
+      if (jobId !== conversionJobId) return;
+      displayBudget = fallbackBudget;
+      dayCostInBaseCurrency = Object.fromEntries(
+        Object.entries(rawDayCosts).map(([dayId, amount]) => [dayId, roundAmount(amount)])
+      );
+      budgetConversionWarning = '汇率服务不可用，暂按原金额汇总。';
+      budgetConversionErrors = [errorMessage(error)];
+      usedConversionRates = [];
+    } finally {
+      if (jobId === conversionJobId) {
+        convertingBudget = false;
+      }
+    }
   }
 
   type LocationEntity = 'transport-from' | 'transport-to' | 'stay' | 'activity';
@@ -202,6 +484,7 @@ import {
         currency
       }
     };
+    void refreshConvertedBudget();
   }
 
   function summarizeRoute(raw: unknown, mode: GaodeMode): string | null {
@@ -501,7 +784,7 @@ import {
     return [];
   }
 
-  function dayCost(day: ItineraryDay): number {
+  function rawDayCost(day: ItineraryDay): number {
     return day.items.reduce((total, item) => {
       const amount =
         item.type === 'transport'
@@ -514,6 +797,10 @@ import {
       if (!amount || Number.isNaN(amount)) return total;
       return total + amount;
     }, 0);
+  }
+
+  function dayCost(day: ItineraryDay): number {
+    return dayCostInBaseCurrency[day.id] ?? rawDayCost(day);
   }
 
   onMount(() => {
@@ -636,25 +923,52 @@ import {
       <div class="flex items-center justify-between gap-3">
         <h3 class="text-lg font-semibold text-slate-700">费用概览</h3>
         <p class="text-sm font-semibold text-slate-700">
-          总费用 {(draft.totalBudget?.transport ?? 0) + (draft.totalBudget?.stay ?? 0) + (draft.totalBudget?.activities ?? 0) + (draft.totalBudget?.others ?? 0)}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}
+          总费用 {formatAmount(displayBudget.total)}{displayBudget.currency}
         </p>
       </div>
+      {#if convertingBudget}
+        <p class="mt-2 text-xs text-slate-500">汇率换算中...</p>
+      {:else if budgetConversionWarning}
+        <p class="mt-2 text-xs text-amber-600">{budgetConversionWarning}</p>
+        {#if budgetConversionErrors.length}
+          <div class="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            {#each budgetConversionErrors.slice(0, 3) as detail}
+              <p>{detail}</p>
+            {/each}
+            {#if budgetConversionErrors.length > 3}
+              <p>还有 {budgetConversionErrors.length - 3} 项，请查看浏览器控制台日志。</p>
+            {/if}
+          </div>
+        {/if}
+      {/if}
+      {#if usedConversionRates.length}
+        <div class="mt-2 rounded-xl border border-sky-100 bg-white/70 px-3 py-2 text-xs text-slate-600">
+          <p>本次换算汇率</p>
+          <div class="mt-1 flex flex-wrap gap-2">
+            {#each usedConversionRates as detail}
+              <span class="rounded-full border border-slate-200 px-2 py-0.5 text-slate-600">
+                1 {detail.from} = {formatRate(detail.rate)} {detail.to}
+              </span>
+            {/each}
+          </div>
+        </div>
+      {/if}
       <div class="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
           <span class="text-xs text-slate-500">交通</span>
-          <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.transport ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
+          <span class="text-base font-semibold text-slate-700">{formatAmount(displayBudget.transport)}{displayBudget.currency}</span>
         </div>
         <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
           <span class="text-xs text-slate-500">住宿</span>
-          <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.stay ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
+          <span class="text-base font-semibold text-slate-700">{formatAmount(displayBudget.stay)}{displayBudget.currency}</span>
         </div>
         <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
           <span class="text-xs text-slate-500">游玩</span>
-          <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.activities ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
+          <span class="text-base font-semibold text-slate-700">{formatAmount(displayBudget.activities)}{displayBudget.currency}</span>
         </div>
         <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
           <span class="text-xs text-slate-500">其他</span>
-          <span class="text-base font-semibold text-slate-700">{draft.totalBudget?.others ?? 0}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}</span>
+          <span class="text-base font-semibold text-slate-700">{formatAmount(displayBudget.others)}{displayBudget.currency}</span>
         </div>
       </div>
     </section>
@@ -672,7 +986,7 @@ import {
                 </div>
                 {#if dayCost(day) > 0}
                   <span class="inline-flex items-center rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs text-sky-600">
-                    预计费用 {dayCost(day)}{draft.baseCurrency ?? draft.totalBudget?.currency ?? 'CNY'}
+                    预计费用 {formatAmount(dayCost(day))}{displayBudget.currency}
                   </span>
                 {/if}
               </header>
@@ -764,7 +1078,7 @@ import {
               <div class="flex items-center gap-2">
                 {#if dayCost(day) > 0}
                   <span class="rounded-full border border-sky-200 bg-white/80 px-3 py-1 text-xs text-sky-600">
-                    预计费用 {dayCost(day)}{draft.baseCurrency ?? draft.totalBudget?.currency ?? 'CNY'}
+                    预计费用 {formatAmount(dayCost(day))}{displayBudget.currency}
                   </span>
                 {/if}
               </div>
@@ -1210,7 +1524,7 @@ import {
             </div>
             {#if dayCost(day) > 0}
               <span style="display: inline-flex; align-items: center; border-radius: 999px; padding: 6px 14px; font-size: 13px; border: 1px solid rgba(14, 116, 144, 0.2); background: rgba(186, 230, 253, 0.35); color: #0e7490; width: fit-content;">
-                当日预算 {dayCost(day)}{draft.baseCurrency ?? draft.totalBudget?.currency ?? 'CNY'}
+                当日预算 {formatAmount(dayCost(day))}{displayBudget.currency}
               </span>
             {/if}
           </div>

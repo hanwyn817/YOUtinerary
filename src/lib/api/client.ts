@@ -1,6 +1,7 @@
 import type {
   ApiListResponse,
   ApiSingleResponse,
+  CurrencyCode,
   Itinerary,
   ItineraryMeta,
   UnlockRequest,
@@ -83,6 +84,28 @@ export async function unlockEditing(payload: UnlockRequest): Promise<UnlockRespo
 
 export async function fetchUnlockStatus(): Promise<UnlockResponse> {
   return await request<UnlockResponse>('/api/auth/unlock', {
+    method: 'GET'
+  });
+}
+
+export interface CurrencyConvertResponse {
+  from: CurrencyCode;
+  to: CurrencyCode;
+  amount: number;
+  result: number;
+}
+
+export async function convertCurrency(params: {
+  from: CurrencyCode;
+  to: CurrencyCode;
+  amount: number;
+}): Promise<CurrencyConvertResponse> {
+  const query = new URLSearchParams({
+    from: params.from,
+    to: params.to,
+    amount: String(params.amount)
+  });
+  return await request<CurrencyConvertResponse>(`/api/exchange/convert?${query.toString()}`, {
     method: 'GET'
   });
 }

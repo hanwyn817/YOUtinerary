@@ -17,6 +17,7 @@ export type Env = {
   DEFAULT_PASSWORD?: string;
   SESSION_TTL_SECONDS?: string;
   GAODE_REST_KEY?: string;
+  FIXER_ACCESS_KEY?: string;
 };
 
 export const SESSION_COOKIE = 'youtinerary_session';
