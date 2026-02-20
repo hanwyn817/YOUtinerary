@@ -80,3 +80,9 @@ export async function unlockEditing(payload: UnlockRequest): Promise<UnlockRespo
     body: JSON.stringify(payload)
   });
 }
+
+export async function fetchUnlockStatus(): Promise<UnlockResponse> {
+  return await request<UnlockResponse>('/api/auth/unlock', {
+    method: 'GET'
+  });
+}

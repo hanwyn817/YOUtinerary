@@ -4,6 +4,7 @@ import {
   deleteItinerary,
   fetchItineraries,
   fetchItinerary,
+  fetchUnlockStatus,
   unlockEditing,
   updateItinerary
 } from '../api/client';
@@ -115,6 +116,16 @@ function createStore() {
     }
   }
 
+  async function syncUnlockStatus(): Promise<boolean> {
+    try {
+      const result = await fetchUnlockStatus();
+      update((state) => ({ ...state, editingUnlocked: result.ok }));
+      return result.ok;
+    } catch {
+      return false;
+    }
+  }
+
   function clearError() {
     update((state) => ({ ...state, error: null }));
   }
@@ -129,6 +140,7 @@ function createStore() {
     persistItinerary,
     removeItinerary,
     unlock,
+    syncUnlockStatus,
     clearError,
     hasItineraries
   };

@@ -9,6 +9,7 @@ import {
   jsonResponse,
   parseBody,
   recordFailedAttempt,
+  requireSession,
   resetAttempts,
   sessionCookieHeader,
   tooManyAttempts,
@@ -20,6 +21,24 @@ export const prerender = false;
 export const OPTIONS: APIRoute = async ({ request }) => {
   const response = handleOptions(request);
   return response ?? jsonResponse({}, { status: 200 });
+};
+
+export const GET: APIRoute = async ({ request, locals }) => {
+  const env = locals.runtime?.env as Env | undefined;
+  if (!env) {
+    return errorResponse('环境变量未准备好', 500);
+  }
+
+  const cors = handleOptions(request);
+  if (cors) return cors;
+
+  try {
+    const ok = await requireSession(env, request);
+    return allowCors(request, jsonResponse({ ok } satisfies UnlockResponse));
+  } catch (error) {
+    console.error(error);
+    return allowCors(request, errorResponse((error as Error).message || '服务器错误', 500));
+  }
 };
 
 export const POST: APIRoute = async ({ request, locals }) => {

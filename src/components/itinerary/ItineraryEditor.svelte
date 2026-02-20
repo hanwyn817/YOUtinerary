@@ -1,5 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { get } from 'svelte/store';
   import { itineraryStore } from '../../lib/stores/itineraries';
   import PasswordGate from './PasswordGate.svelte';
   import ItineraryWorkspace from './ItineraryWorkspace.svelte';
@@ -14,22 +15,24 @@
   $: state = $itineraryStore;
   $: active = state.activeItinerary;
 
-onMount(() => {
-  itineraryStore.clearError();
-  if (itineraryId === 'new') {
-    if (state.editingUnlocked) {
-      initializeNewDraft();
+  onMount(async () => {
+    itineraryStore.clearError();
+    await itineraryStore.syncUnlockStatus();
+    const currentState = get(itineraryStore);
+    if (itineraryId === 'new') {
+      if (currentState.editingUnlocked) {
+        initializeNewDraft();
+      } else {
+        requestedUnlock = true;
+      }
     } else {
-      requestedUnlock = true;
+      itineraryStore.selectItinerary(itineraryId);
     }
-  } else {
-    itineraryStore.selectItinerary(itineraryId);
-  }
-});
+  });
 
-$: if (itineraryId === 'new' && state.editingUnlocked && !newDraftInitialized) {
-  initializeNewDraft();
-}
+  $: if (itineraryId === 'new' && state.editingUnlocked && !newDraftInitialized) {
+    initializeNewDraft();
+  }
 
   $: if (itineraryId === 'new' && newDraftInitialized && active?.id && typeof window !== 'undefined') {
     if (window.location.pathname !== `/itinerary/${active.id}`) {
@@ -100,7 +103,15 @@ $: if (itineraryId === 'new' && state.editingUnlocked && !newDraftInitialized) {
       {/if}
     </div>
     <div class="flex flex-wrap gap-3">
-      {#if !state.editingUnlocked}
+      {#if state.editingUnlocked}
+        <span
+          class="inline-flex items-center justify-center rounded-full border border-emerald-300 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700"
+          role="status"
+          aria-live="polite"
+        >
+          已解锁（可编辑和保存）
+        </span>
+      {:else}
         <button
           class="inline-flex items-center justify-center rounded-full border border-sky-400 px-4 py-2 text-sm font-semibold text-sky-600 hover:bg-sky-100"
           on:click={ensureUnlocked}
