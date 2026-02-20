@@ -203,11 +203,13 @@ import {
         <article class="rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-sky-100">
           <header class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
             <div class="flex flex-col gap-2">
-              <h3 class="text-lg font-semibold text-slate-800">{group.itinerary.title}</h3>
+              <div class="flex flex-wrap items-center gap-2">
+                <h3 class="text-lg font-semibold text-slate-800">{group.itinerary.title}</h3>
+                <span class="text-xs text-slate-400">更新于 {new Date(group.itinerary.updatedAt).toLocaleString('zh-CN')}</span>
+              </div>
               {#if group.itinerary.description}
                 <p class="text-sm text-slate-600">{group.itinerary.description}</p>
               {/if}
-              <span class="text-xs text-slate-400">更新于 {new Date(group.itinerary.updatedAt).toLocaleString('zh-CN')}</span>
             </div>
             <a
               href={`/itinerary/${group.itinerary.id}`}

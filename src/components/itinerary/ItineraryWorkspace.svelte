@@ -42,7 +42,6 @@ import {
   let draft: Itinerary | null = null;
   let dirty = false;
   let exporting = false;
-  let autoLabelDays = true;
   let routingItemId: string | null = null;
   let previewMode = false;
   let exportLayoutVisible = false;
@@ -55,7 +54,8 @@ import {
   $: state = $itineraryStore;
 
   $: if (state.activeItinerary && (!draft || draft.id !== state.activeItinerary.id)) {
-    draft = cloneValue(state.activeItinerary);
+    const cloned = cloneValue(state.activeItinerary);
+    draft = { ...cloned, days: relabelDays(cloned.days) };
     if (!draft.baseCurrency) {
       draft.baseCurrency = 'CNY';
     }
@@ -75,13 +75,7 @@ import {
   }
 
   function relabelDays(days: ItineraryDay[]): ItineraryDay[] {
-    if (!autoLabelDays) return days;
-    const autoPattern = /^第\d+天$/;
-    return days.map((day, index) =>
-      !day.label || autoPattern.test(day.label)
-        ? { ...day, label: `第${index + 1}天` }
-        : day
-    );
+    return days.map((day, index) => ({ ...day, label: `第${index + 1}天` }));
   }
 
   type LocationEntity = 'transport-from' | 'transport-to' | 'stay' | 'activity';
@@ -309,6 +303,17 @@ import {
     draft = { ...draft, days: relabelDays(draft.days.filter((day) => day.id !== dayId)) };
     recalcBudget();
     markDirty();
+  }
+
+  function confirmDeleteDay(dayId: string) {
+    if (!draft) return;
+    const day = draft.days.find((item) => item.id === dayId);
+    const label = day?.label ?? '该日程';
+    if (typeof window !== 'undefined') {
+      const confirmed = window.confirm(`确认删除${label}吗？`);
+      if (!confirmed) return;
+    }
+    deleteDay(dayId);
   }
 
   function reorderDay(dayId: string, direction: -1 | 1) {
@@ -540,30 +545,32 @@ import {
     <div class="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-lg shadow-sky-100">
       <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div class="flex flex-1 flex-col gap-4">
-          <label class="flex flex-col gap-2 text-sm text-slate-600">
-            行程标题
-            <input
-              class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-lg font-semibold text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-              bind:value={draft.title}
-              on:input={markDirty}
-              placeholder="给行程起个名字吧"
-            />
-          </label>
-          <label class="flex flex-col gap-2 text-sm text-slate-600">
-            费用基准货币
-            <select
-              class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-700 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
-              bind:value={draft.baseCurrency}
-              on:change={() => {
-                markDirty();
-                recalcBudget();
-              }}
-            >
-              {#each currencyOptions as option}
-                <option value={option}>{option}</option>
-              {/each}
-            </select>
-          </label>
+          <div class="flex items-end gap-4">
+            <label class="flex flex-1 flex-col gap-2 text-sm text-slate-600">
+              行程标题
+              <input
+                class="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-lg font-semibold text-slate-800 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                bind:value={draft.title}
+                on:input={markDirty}
+                placeholder="给行程起个名字吧"
+              />
+            </label>
+            <label class="flex w-28 flex-shrink-0 flex-col gap-2 text-sm text-slate-600">
+              费用基准货币
+              <select
+                class="rounded-2xl border border-slate-300 bg-white px-3 py-3 text-base text-slate-700 focus:border-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-200"
+                bind:value={draft.baseCurrency}
+                on:change={() => {
+                  markDirty();
+                  recalcBudget();
+                }}
+              >
+                {#each currencyOptions as option}
+                  <option value={option}>{option}</option>
+                {/each}
+              </select>
+            </label>
+          </div>
           <label class="flex flex-col gap-2 text-sm text-slate-600">
             行程概览
             <textarea
@@ -626,7 +633,12 @@ import {
     </div>
 
     <section class="rounded-3xl border border-slate-200 bg-sky-50/60 p-6 text-sm text-slate-700 shadow-xl shadow-sky-100">
-      <h3 class="text-lg font-semibold text-slate-700">费用概览</h3>
+      <div class="flex items-center justify-between gap-3">
+        <h3 class="text-lg font-semibold text-slate-700">费用概览</h3>
+        <p class="text-sm font-semibold text-slate-700">
+          总费用 {(draft.totalBudget?.transport ?? 0) + (draft.totalBudget?.stay ?? 0) + (draft.totalBudget?.activities ?? 0) + (draft.totalBudget?.others ?? 0)}{draft.totalBudget?.currency ?? draft.baseCurrency ?? 'CNY'}
+        </p>
+      </div>
       <div class="mt-4 grid gap-4 sm:grid-cols-2 md:grid-cols-4">
         <div class="flex flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4">
           <span class="text-xs text-slate-500">交通</span>
@@ -652,7 +664,7 @@ import {
           {#each draft.days as day, dayIndex}
             <article class="rounded-3xl border border-slate-200 bg-slate-50/80 p-5 shadow-inner shadow-slate-100">
               <header class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div class="flex flex-col gap-1">
+                <div class="flex items-center gap-2">
                   <h3 class="text-lg font-semibold text-slate-800">{day.label || `第${dayIndex + 1}天`}</h3>
                   {#if day.date}
                     <span class="text-xs text-slate-500">{day.date}</span>
@@ -705,12 +717,12 @@ import {
           <section class="rounded-2xl border border-slate-200 bg-slate-100/80 p-5">
             <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <input
-                  class="text-xl font-semibold text-slate-800 focus:border-sky-400 focus:outline-none focus:ring-2 focus:ring-sky-200"
-                  value={day.label}
-                  on:change={(event) => updateDay(day.id, { label: (event.target as HTMLInputElement).value })}
-                  placeholder={`第${dayIndex + 1}天`}
-                />
+                <div class="flex items-center gap-2">
+                  <h3 class="text-xl font-semibold text-slate-800">{day.label || `第${dayIndex + 1}天`}</h3>
+                  {#if day.date}
+                    <span class="text-sm text-slate-500">{day.date}</span>
+                  {/if}
+                </div>
                 <div class="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
                   <label class="flex items-center gap-2">
                     日期（可选）
@@ -729,7 +741,7 @@ import {
                   </button>
                   <button
                     class="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-500 hover:border-red-500/40 hover:text-red-400"
-                    on:click={() => deleteDay(day.id)}
+                    on:click={() => confirmDeleteDay(day.id)}
                   >
                     删除当天
                   </button>
@@ -755,12 +767,6 @@ import {
                     预计费用 {dayCost(day)}{draft.baseCurrency ?? draft.totalBudget?.currency ?? 'CNY'}
                   </span>
                 {/if}
-                <button
-                  class="rounded-full border border-sky-400 px-3 py-1 text-xs text-sky-600 hover:bg-sky-100"
-                  on:click={() => (autoLabelDays = !autoLabelDays)}
-                >
-                  {autoLabelDays ? '关闭自动标签' : '启用自动标签'}
-                </button>
               </div>
             </div>
 
