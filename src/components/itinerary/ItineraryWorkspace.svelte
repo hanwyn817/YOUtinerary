@@ -25,6 +25,7 @@
     summarizeTime,
     suggestGaodeMode,
   } from "../../lib/utils/schedule";
+  import DayItemSummary from "./DayItemSummary.svelte";
 
   const transportOptions: { value: TransportMode; label: string }[] = [
     { value: "plane", label: "飞机" },
@@ -1299,9 +1300,11 @@
                           >
                         {/if}
                       </div>
-                      <p class="mt-2 text-sm font-semibold text-slate-800">
-                        {timelineSummary(entry)}
-                      </p>
+                      <div
+                        class="mt-2 text-sm font-semibold text-slate-800 flex flex-wrap gap-1.5 items-center"
+                      >
+                        <DayItemSummary item={entry} />
+                      </div>
                       <div
                         class="mt-2 flex flex-wrap gap-2 text-xs text-slate-500"
                       >

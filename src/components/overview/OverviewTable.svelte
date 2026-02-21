@@ -55,6 +55,14 @@
           type: "note",
           typeLabel: getDayItemLabel("note"),
           summary: itinerary.description?.trim() || "（暂无具体安排）",
+          item: {
+            id: "empty",
+            type: "note",
+            note: {
+              id: "empty",
+              text: itinerary.description?.trim() || "（暂无具体安排）",
+            },
+          } as DayItem,
           time: "",
           cost: "",
         };
@@ -80,6 +88,7 @@
               type: item.type,
               typeLabel: getDayItemLabel(item.type),
               summary: summarizeDayItem(item),
+              item,
               time: extractTime(item),
               cost: extractCostDisplay(item, baseCurrency),
               modeLabel:

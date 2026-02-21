@@ -1,11 +1,14 @@
 <script lang="ts">
-  import type { TableRow } from './types';
+  import type { TableRow } from "./types";
+  import DayItemSummary from "../itinerary/DayItemSummary.svelte";
 
   export let tableRows: TableRow[];
 </script>
 
 <div class="mt-4 hidden overflow-x-auto md:block">
-  <table class="min-w-full divide-y divide-slate-200 text-left text-sm text-slate-700">
+  <table
+    class="min-w-full divide-y divide-slate-200 text-left text-sm text-slate-700"
+  >
     <thead class="bg-slate-100 text-xs uppercase tracking-wider text-slate-500">
       <tr>
         <th class="px-4 py-3">日程</th>
@@ -27,18 +30,23 @@
             </div>
           </td>
           <td class="px-4 py-3 align-top text-slate-600">
-            {row.time || '—'}
+            {row.time || "—"}
           </td>
           <td class="px-4 py-3 align-top">
             <div class="inline-flex items-center gap-2">
-              <span class="inline-flex rounded-full border border-slate-200 px-2 py-1 text-xs text-slate-500">{row.typeLabel}</span>
+              <span
+                class="inline-flex rounded-full border border-slate-200 px-2 py-1 text-xs text-slate-500"
+                >{row.typeLabel}</span
+              >
               {#if row.modeLabel}
                 <span class="text-xs text-slate-500">{row.modeLabel}</span>
               {/if}
             </div>
           </td>
           <td class="px-4 py-3 align-top">
-            <span class="text-slate-700">{row.summary}</span>
+            <div class="text-slate-700">
+              <DayItemSummary item={row.item} />
+            </div>
           </td>
           <td class="px-4 py-3 align-top">
             {#if row.cost}

@@ -1,4 +1,4 @@
-import type { DayItemType } from '../../lib/types';
+import type { DayItemType, DayItem } from '../../lib/types';
 
 export interface TableRow {
   id: string;
@@ -7,6 +7,7 @@ export interface TableRow {
   type: DayItemType;
   typeLabel: string;
   summary: string;
+  item: DayItem;
   time: string;
   cost: string;
   modeLabel?: string;

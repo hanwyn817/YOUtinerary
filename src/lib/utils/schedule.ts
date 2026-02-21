@@ -1,4 +1,4 @@
-import type { DayItem, DayItemType, TransportMode } from '../types';
+import type { DayItem, DayItemType, TransportMode, LocationPoint } from '../types';
 
 export const DAY_ITEM_LABELS: Record<DayItemType, string> = {
   transport: '交通',
@@ -101,9 +101,16 @@ export function extractCostDisplay(item: DayItem, fallbackCurrency = 'CNY'): str
             ? item.meal.cost
             : item.type === 'shopping'
               ? item.shopping.cost
-          : undefined;
+              : undefined;
   if (!cost) return '';
   const { amount, currency } = cost;
   if (amount === undefined || amount === null) return '';
   return `${amount}${currency ?? fallbackCurrency}`;
+}
+
+export function getAmapUrl(location: LocationPoint | undefined | null): string | null {
+  if (!location || typeof location.lat !== 'number' || typeof location.lng !== 'number') {
+    return null;
+  }
+  return `https://uri.amap.com/marker?position=${location.lng},${location.lat}&name=${encodeURIComponent(location.name || '目的地')}`;
 }
