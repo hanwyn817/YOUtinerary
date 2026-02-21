@@ -7,7 +7,10 @@
     export let showIcon: boolean = true;
 
     $: url = getAmapUrl(location);
-    $: displayName = location?.name || fallbackName;
+    $: displayName =
+        fallbackName && fallbackName !== "未填"
+            ? fallbackName
+            : location?.name || "未填";
 </script>
 
 {#if url}
