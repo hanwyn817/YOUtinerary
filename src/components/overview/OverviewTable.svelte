@@ -10,24 +10,9 @@ import {
   getTransportModeLabel
 } from '../../lib/utils/schedule';
 
-  interface TableRow {
-    id: string;
-    dayLabel: string;
-    date?: string;
-    type: DayItemType;
-    typeLabel: string;
-    summary: string;
-    time: string;
-    cost: string;
-    modeLabel?: string;
-  }
-
-  interface DayBucket {
-    key: string;
-    label: string;
-    date?: string;
-    rows: TableRow[];
-  }
+import type { TableRow, DayBucket } from './types';
+  import DesktopItineraryTable from './DesktopItineraryTable.svelte';
+  import MobileItineraryList from './MobileItineraryList.svelte';
 
   interface ItineraryGroup {
     itinerary: Itinerary;
@@ -223,121 +208,14 @@ import {
             </a>
           </header>
 
-          <div class="mt-4 md:hidden">
-            <button
-              type="button"
-              class="flex w-full items-center justify-between rounded-3xl border border-slate-200 bg-slate-50/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-inner shadow-slate-100"
-              on:click={() => toggleMobileItinerary(group.itinerary.id)}
-              aria-expanded={isItineraryExpanded}
-              aria-controls={`mobile-itinerary-${group.itinerary.id}`}
-            >
-              <span>{isItineraryExpanded ? '收起行程' : '展开行程'}</span>
-              <svg
-                class={`h-4 w-4 text-slate-500 transition-transform duration-200 ${
-                  isItineraryExpanded ? 'rotate-180' : ''
-                }`}
-                viewBox="0 0 20 20"
-                fill="currentColor"
-                aria-hidden="true"
-              >
-                <path fill-rule="evenodd" d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z" clip-rule="evenodd" />
-              </svg>
-            </button>
-          </div>
+          <MobileItineraryList
+            itineraryId={group.itinerary.id}
+            isItineraryExpanded={isItineraryExpanded}
+            dayBuckets={group.dayBuckets}
+            on:toggle={() => toggleMobileItinerary(group.itinerary.id)}
+          />
 
-          {#if isItineraryExpanded}
-            <div id={`mobile-itinerary-${group.itinerary.id}`} class="mt-3 flex flex-col gap-4 md:hidden">
-              {#each group.dayBuckets as bucket (bucket.key)}
-                <div class="rounded-3xl border border-slate-200 bg-slate-50/70 p-4 shadow-inner shadow-slate-100">
-                  <div class="flex flex-col gap-1">
-                    <span class="text-sm font-semibold text-slate-800">{bucket.label || '未命名日程'}</span>
-                    {#if bucket.date}
-                      <span class="text-xs text-slate-500">{bucket.date}</span>
-                    {/if}
-                  </div>
-
-                  <div class="mt-3 flex flex-col gap-2">
-                    {#if bucket.rows.length === 0}
-                      <div class="rounded-2xl border border-dashed border-slate-200 bg-white/80 px-3 py-4 text-xs text-slate-500">
-                        这一天还没有安排。
-                      </div>
-                    {:else}
-                      {#each bucket.rows as row (row.id)}
-                        <div class="relative pl-4">
-                          <span class="absolute left-1 top-2 h-2 w-2 -translate-x-1/2 rounded-full bg-sky-400"></span>
-                          <div class="rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-sm">
-                            <div class="flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
-                              <div class="flex flex-wrap items-center gap-2">
-                                <span>{row.time || '时间未定'}</span>
-                                <span class="rounded-full bg-sky-100 px-2 py-1 text-xs text-sky-600">{row.typeLabel}</span>
-                                {#if row.modeLabel}
-                                  <span class="rounded-full bg-emerald-100 px-2 py-1 text-xs text-emerald-600">{row.modeLabel}</span>
-                                {/if}
-                              </div>
-                              {#if row.cost}
-                                <span class="text-sky-600">{row.cost}</span>
-                              {/if}
-                            </div>
-                            <p class="mt-1.5 text-sm font-medium text-slate-700">{row.summary}</p>
-                          </div>
-                        </div>
-                      {/each}
-                    {/if}
-                  </div>
-                </div>
-              {/each}
-            </div>
-          {:else}
-            <div id={`mobile-itinerary-${group.itinerary.id}`} hidden></div>
-          {/if}
-
-
-          <div class="mt-4 hidden overflow-x-auto md:block">
-            <table class="min-w-full divide-y divide-slate-200 text-left text-sm text-slate-700">
-              <thead class="bg-slate-100 text-xs uppercase tracking-wider text-slate-500">
-                <tr>
-                  <th class="px-4 py-3">日程</th>
-                  <th class="px-4 py-3">时间</th>
-                  <th class="px-4 py-3">类型</th>
-                  <th class="px-4 py-3">详情</th>
-                  <th class="px-4 py-3">费用</th>
-                </tr>
-              </thead>
-              <tbody class="divide-y divide-slate-100">
-                {#each group.tableRows as row (row.id)}
-                  <tr class="hover:bg-slate-50">
-                    <td class="px-4 py-3 align-top">
-                      <div class="flex flex-col gap-1">
-                        <span class="font-medium text-slate-800">{row.dayLabel}</span>
-                        {#if row.date}
-                          <span class="text-xs text-slate-500">{row.date}</span>
-                        {/if}
-                      </div>
-                    </td>
-                    <td class="px-4 py-3 align-top text-slate-600">
-                      {row.time || '—'}
-                    </td>
-                    <td class="px-4 py-3 align-top">
-                      <div class="inline-flex items-center gap-2">
-                        <span class="inline-flex rounded-full border border-slate-200 px-2 py-1 text-xs text-slate-500">{row.typeLabel}</span>
-                        {#if row.modeLabel}
-                          <span class="text-xs text-slate-500">{row.modeLabel}</span>
-                        {/if}
-                      </div>
-                    </td>
-                    <td class="px-4 py-3 align-top">
-                      <span class="text-slate-700">{row.summary}</span>
-                    </td>
-                    <td class="px-4 py-3 align-top">
-                      {#if row.cost}
-                        <span class="text-sky-600">{row.cost}</span>
-                      {/if}
-                    </td>
-                  </tr>
-                {/each}
-              </tbody>
-            </table>
-          </div>
+          <DesktopItineraryTable tableRows={group.tableRows} />
         </article>
       {/each}
     </div>
