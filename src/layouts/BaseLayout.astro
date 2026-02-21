@@ -1,5 +1,6 @@
 ---
 import { ViewTransitions } from "astro:transitions";
+import { pwaInfo } from "virtual:pwa-info";
 import "../styles/global.css";
 const {
   title = "YOUtinerary",
@@ -21,49 +22,48 @@ const {
     />
     <title>{title}</title>
     <ViewTransitions />
-  </head>
-  <body class="min-h-screen bg-sky-50 text-slate-800">
-    <div
-      class="relative flex min-h-screen flex-col bg-gradient-to-br from-sky-50 via-white to-sky-100"
+  </head>{pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} />}
+  <script src="/src/pwa.ts"></script>
+
+
+  <div
+    class="relative flex min-h-screen flex-col bg-gradient-to-br from-sky-50 via-white to-sky-100"
+  >
+    <nav
+      class="sticky top-0 z-50 w-full border-b border-white/20 bg-white/60 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8"
     >
-      <nav
-        class="sticky top-0 z-50 w-full border-b border-white/20 bg-white/60 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8"
-      >
-        <div class="mx-auto flex w-full max-w-5xl items-center justify-between">
-          <a
-            href="/"
-            class="flex items-center gap-2 text-lg font-bold text-slate-800 transition hover:text-sky-600"
-          >
-            <span
-              class="rounded-lg bg-gradient-to-br from-sky-400 to-emerald-400 px-2 py-1 text-white shadow-sm"
-              >Y</span
-            >
-            YOUtinerary
-          </a>
-          <div
-            class="flex items-center gap-6 text-sm font-medium text-slate-600"
-          >
-            <a href="/" class="transition hover:text-sky-600">首页</a>
-            <a href="/docs" class="transition hover:text-sky-600">文档</a>
-          </div>
-        </div>
-      </nav>
-      <slot name="hero" />
-      <main
-        class="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-10 sm:px-6 lg:px-8"
-      >
-        <slot />
-      </main>
-      <footer
-        class="border-t border-slate-200 bg-white/70 py-6 text-sm text-slate-500"
-      >
-        <div
-          class="mx-auto flex w-full max-w-5xl flex-col gap-2 px-4 sm:flex-row sm:items-center sm:justify-between"
+      <div class="mx-auto flex w-full max-w-5xl items-center justify-between">
+        <a
+          href="/"
+          class="flex items-center gap-2 text-lg font-bold text-slate-800 transition hover:text-sky-600"
         >
-          <p>© {new Date().getFullYear()} YOUtinerary</p>
-          <p>那就出发吧！</p>
+          <span
+            class="rounded-lg bg-gradient-to-br from-sky-400 to-emerald-400 px-2 py-1 text-white shadow-sm"
+            >Y</span
+          >
+          YOUtinerary
+        </a>
+        <div class="flex items-center gap-6 text-sm font-medium text-slate-600">
+          <a href="/" class="transition hover:text-sky-600">首页</a>
+          <a href="/docs" class="transition hover:text-sky-600">文档</a>
         </div>
-      </footer>
-    </div>
-  </body>
+      </div>
+    </nav>
+    <slot name="hero" />
+    <main
+      class="mx-auto w-full max-w-6xl flex-1 px-4 pb-16 pt-10 sm:px-6 lg:px-8"
+    >
+      <slot />
+    </main>
+    <footer
+      class="border-t border-slate-200 bg-white/70 py-6 text-sm text-slate-500"
+    >
+      <div
+        class="mx-auto flex w-full max-w-5xl flex-col gap-2 px-4 sm:flex-row sm:items-center sm:justify-between"
+      >
+        <p>© {new Date().getFullYear()} YOUtinerary</p>
+        <p>那就出发吧！</p>
+      </div>
+    </footer>
+  </div>
 </html>
