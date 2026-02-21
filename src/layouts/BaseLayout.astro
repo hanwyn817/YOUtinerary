@@ -22,13 +22,13 @@ const {
     />
     <title>{title}</title>
     <ViewTransitions />
-  </head>{pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} />}
-  <script src="/src/pwa.ts"></script>
-
-
-  <div
-    class="relative flex min-h-screen flex-col bg-gradient-to-br from-sky-50 via-white to-sky-100"
-  >
+    {pwaInfo && <Fragment set:html={pwaInfo.webManifest.linkTag} />}
+  </head>
+  <body>
+    <script src="/src/pwa.ts"></script>
+    <div
+      class="relative flex min-h-screen flex-col bg-gradient-to-br from-sky-50 via-white to-sky-100"
+    >
     <nav
       class="sticky top-0 z-50 w-full border-b border-white/20 bg-white/60 px-4 py-3 backdrop-blur-md sm:px-6 lg:px-8"
     >
@@ -65,5 +65,6 @@ const {
         <p>那就出发吧！</p>
       </div>
     </footer>
-  </div>
+    </div>
+  </body>
 </html>

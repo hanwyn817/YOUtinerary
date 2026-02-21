@@ -18,7 +18,7 @@ export default defineConfig({
         enabled: true, // Enable PWA in development mode for testing
       },
       workbox: {
-        navigateFallback: '/',
+        navigateFallback: null,
         globPatterns: ['**/*.{js,css,html,ico,png,svg}'],
       },
       manifest: {
@@ -31,9 +31,9 @@ export default defineConfig({
         icons: [
           {
             src: '/favicon.svg',
-            sizes: '192x192 512x512',
+            sizes: 'any',
             type: 'image/svg+xml',
-            purpose: 'any maskable'
+            purpose: 'any'
           }
         ]
       }
