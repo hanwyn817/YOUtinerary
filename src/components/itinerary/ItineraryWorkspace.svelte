@@ -1508,6 +1508,36 @@
                             选地点
                           </button>
                         </div>
+                        {#if entry.transport.fromLocation}
+                          <div
+                            class="mt-1 flex items-center justify-between text-[11px] text-emerald-600"
+                          >
+                            <span
+                              class="flex items-center gap-1 truncate"
+                              title={entry.transport.fromLocation.name}
+                            >
+                              <svg
+                                class="h-3 w-3 shrink-0"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                ><path
+                                  fill-rule="evenodd"
+                                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                  clip-rule="evenodd"
+                                /></svg
+                              >
+                              已绑定坐标: {entry.transport.fromLocation.name}
+                            </span>
+                            <button
+                              type="button"
+                              class="ml-2 shrink-0 text-slate-400 hover:text-red-500"
+                              on:click|preventDefault={() => {
+                                entry.transport.fromLocation = undefined;
+                                markDirty();
+                              }}>清除绑定</button
+                            >
+                          </div>
+                        {/if}
                       </label>
                       <label class="flex flex-col gap-1 text-xs text-slate-600">
                         到达地
@@ -1531,6 +1561,36 @@
                             选地点
                           </button>
                         </div>
+                        {#if entry.transport.toLocation}
+                          <div
+                            class="mt-1 flex items-center justify-between text-[11px] text-emerald-600"
+                          >
+                            <span
+                              class="flex items-center gap-1 truncate"
+                              title={entry.transport.toLocation.name}
+                            >
+                              <svg
+                                class="h-3 w-3 shrink-0"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                ><path
+                                  fill-rule="evenodd"
+                                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                  clip-rule="evenodd"
+                                /></svg
+                              >
+                              已绑定坐标: {entry.transport.toLocation.name}
+                            </span>
+                            <button
+                              type="button"
+                              class="ml-2 shrink-0 text-slate-400 hover:text-red-500"
+                              on:click|preventDefault={() => {
+                                entry.transport.toLocation = undefined;
+                                markDirty();
+                              }}>清除绑定</button
+                            >
+                          </div>
+                        {/if}
                       </label>
                     </div>
                     <div class="grid gap-3 sm:grid-cols-4">
@@ -1663,6 +1723,36 @@
                             选地点
                           </button>
                         </div>
+                        {#if entry.stay.location}
+                          <div
+                            class="mt-1 flex items-center justify-between text-[11px] text-emerald-600"
+                          >
+                            <span
+                              class="flex items-center gap-1 truncate"
+                              title={entry.stay.location.name}
+                            >
+                              <svg
+                                class="h-3 w-3 shrink-0"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                ><path
+                                  fill-rule="evenodd"
+                                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                  clip-rule="evenodd"
+                                /></svg
+                              >
+                              已绑定坐标: {entry.stay.location.name}
+                            </span>
+                            <button
+                              type="button"
+                              class="ml-2 shrink-0 text-slate-400 hover:text-red-500"
+                              on:click|preventDefault={() => {
+                                entry.stay.location = undefined;
+                                markDirty();
+                              }}>清除绑定</button
+                            >
+                          </div>
+                        {/if}
                       </label>
                       <label class="flex flex-col gap-1 text-xs text-slate-600">
                         地址
@@ -1749,6 +1839,36 @@
                             选地点
                           </button>
                         </div>
+                        {#if entry.activity.location}
+                          <div
+                            class="mt-1 flex items-center justify-between text-[11px] text-emerald-600"
+                          >
+                            <span
+                              class="flex items-center gap-1 truncate"
+                              title={entry.activity.location.name}
+                            >
+                              <svg
+                                class="h-3 w-3 shrink-0"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                ><path
+                                  fill-rule="evenodd"
+                                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                  clip-rule="evenodd"
+                                /></svg
+                              >
+                              已绑定坐标: {entry.activity.location.name}
+                            </span>
+                            <button
+                              type="button"
+                              class="ml-2 shrink-0 text-slate-400 hover:text-red-500"
+                              on:click|preventDefault={() => {
+                                entry.activity.location = undefined;
+                                markDirty();
+                              }}>清除绑定</button
+                            >
+                          </div>
+                        {/if}
                       </label>
                       <label class="flex flex-col gap-1 text-xs text-slate-600">
                         地址
@@ -1852,6 +1972,36 @@
                             选地点
                           </button>
                         </div>
+                        {#if entry.meal.location}
+                          <div
+                            class="mt-1 flex items-center justify-between text-[11px] text-emerald-600"
+                          >
+                            <span
+                              class="flex items-center gap-1 truncate"
+                              title={entry.meal.location.name}
+                            >
+                              <svg
+                                class="h-3 w-3 shrink-0"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                ><path
+                                  fill-rule="evenodd"
+                                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                  clip-rule="evenodd"
+                                /></svg
+                              >
+                              已绑定坐标: {entry.meal.location.name}
+                            </span>
+                            <button
+                              type="button"
+                              class="ml-2 shrink-0 text-slate-400 hover:text-red-500"
+                              on:click|preventDefault={() => {
+                                entry.meal.location = undefined;
+                                markDirty();
+                              }}>清除绑定</button
+                            >
+                          </div>
+                        {/if}
                       </label>
                       <label class="flex flex-col gap-1 text-xs text-slate-600">
                         地址
@@ -1954,6 +2104,36 @@
                             选地点
                           </button>
                         </div>
+                        {#if entry.shopping.location}
+                          <div
+                            class="mt-1 flex items-center justify-between text-[11px] text-emerald-600"
+                          >
+                            <span
+                              class="flex items-center gap-1 truncate"
+                              title={entry.shopping.location.name}
+                            >
+                              <svg
+                                class="h-3 w-3 shrink-0"
+                                viewBox="0 0 20 20"
+                                fill="currentColor"
+                                ><path
+                                  fill-rule="evenodd"
+                                  d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z"
+                                  clip-rule="evenodd"
+                                /></svg
+                              >
+                              已绑定坐标: {entry.shopping.location.name}
+                            </span>
+                            <button
+                              type="button"
+                              class="ml-2 shrink-0 text-slate-400 hover:text-red-500"
+                              on:click|preventDefault={() => {
+                                entry.shopping.location = undefined;
+                                markDirty();
+                              }}>清除绑定</button
+                            >
+                          </div>
+                        {/if}
                       </label>
                       <label class="flex flex-col gap-1 text-xs text-slate-600">
                         地址
