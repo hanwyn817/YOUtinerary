@@ -848,6 +848,25 @@
     }
   }
 
+  function exportAsJson() {
+    if (!draft) return;
+    try {
+      const dataStr = JSON.stringify(draft, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${draft.slug || draft.id || "itinerary"}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Failed to export JSON:", error);
+      alert("导出 JSON 失败，请检查控制台。");
+    }
+  }
+
   async function exportAsImage() {
     if (!draft) return;
     exporting = true;
@@ -1116,6 +1135,14 @@
             disabled={exporting}
           >
             {exporting ? "导出中…" : "导出为图片"}
+          </button>
+          <button
+            class="inline-flex items-center justify-center rounded-full border border-slate-200 px-5 py-2 font-semibold text-slate-600 hover:border-sky-400 hover:text-sky-500 disabled:opacity-60"
+            on:click={exportAsJson}
+            disabled={exporting}
+            title="导出 JSON 数据备份"
+          >
+            导出为 JSON
           </button>
           <button
             class="inline-flex items-center justify-center rounded-full border border-slate-200 px-5 py-2 text-slate-500 hover:border-sky-300 hover:text-sky-500"

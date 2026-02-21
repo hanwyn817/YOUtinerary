@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { fetchItinerariesFull } from "../../lib/api/client";
+  import { fetchItinerariesFull, createItinerary } from "../../lib/api/client";
   import type { DayItem, DayItemType, Itinerary } from "../../lib/types";
   import {
     getDayItemLabel,
@@ -39,6 +39,94 @@
       loading = false;
     }
   });
+
+  async function exportAllAsJson() {
+    try {
+      const dataStr = JSON.stringify(itineraries, null, 2);
+      const blob = new Blob([dataStr], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `youtinerary-backup-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Failed to export JSON:", err);
+      alert("导出备份失败，请检查控制台。");
+    }
+  }
+
+  let fileInput: HTMLInputElement;
+
+  async function importFromJson(event: Event) {
+    const target = event.target as HTMLInputElement;
+    const file = target.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text);
+      let itemsToImport: Partial<Itinerary>[] = [];
+
+      if (Array.isArray(parsed)) {
+        itemsToImport = parsed;
+      } else if (typeof parsed === "object" && parsed !== null) {
+        itemsToImport = [parsed];
+      } else {
+        throw new Error("Invalid JSON format");
+      }
+
+      if (itemsToImport.length === 0) {
+        alert("文件中没有找到行程数据。");
+        return;
+      }
+
+      const confirmed = confirm(
+        `在文件中找到 ${itemsToImport.length} 个行程，确认导入吗？此操作会创建新的行程草稿。`,
+      );
+      if (!confirmed) {
+        if (fileInput) fileInput.value = "";
+        return;
+      }
+
+      loading = true;
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const item of itemsToImport) {
+        try {
+          const payload = { ...item };
+          delete payload.id; // Ensure we create new items
+          await createItinerary(payload);
+          successCount++;
+        } catch (err) {
+          console.error("Failed to import itinerary:", err);
+          failCount++;
+        }
+      }
+
+      alert(`导入完成！\n成功: ${successCount}\n失败: ${failCount}`);
+
+      // Reload list
+      itineraries = await fetchItinerariesFull();
+      groups = buildGroups(itineraries);
+      collapsedBuckets = collectAllBucketKeys(groups);
+    } catch (err) {
+      console.error("Failed to parse or import JSON:", err);
+      alert("导入失败，文件格式可能不正确。");
+    } finally {
+      if (fileInput) fileInput.value = "";
+      loading = false;
+    }
+  }
+
+  function triggerFileInput() {
+    if (fileInput) {
+      fileInput.click();
+    }
+  }
 
   function buildGroups(list: Itinerary[]): ItineraryGroup[] {
     return list.map((itinerary) => {
@@ -217,6 +305,33 @@
 </script>
 
 <section class="flex flex-col gap-6">
+  <div class="flex flex-wrap items-center justify-between gap-4">
+    <h2 class="text-xl font-bold text-slate-800">全部行程</h2>
+    <div class="flex items-center gap-3">
+      <button
+        class="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-sky-400 hover:text-sky-500"
+        on:click={exportAllAsJson}
+        title="备份所有行程数据"
+      >
+        导出全部 (备份)
+      </button>
+      <button
+        class="inline-flex items-center justify-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-600 hover:border-emerald-400 hover:text-emerald-500"
+        on:click={triggerFileInput}
+        title="从 JSON 文件恢复数据"
+      >
+        导入数据 (还原)
+      </button>
+      <input
+        type="file"
+        accept="application/json"
+        class="hidden"
+        bind:this={fileInput}
+        on:change={importFromJson}
+      />
+    </div>
+  </div>
+
   {#if loading}
     <div
       class="flex items-center justify-center rounded-3xl border border-slate-200 bg-sky-50 py-12 text-sm text-slate-500"
