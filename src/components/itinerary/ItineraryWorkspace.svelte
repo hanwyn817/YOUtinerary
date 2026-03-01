@@ -111,6 +111,7 @@
   let confirmingDelete = false;
   let deleting = false;
   let deleteError: string | null = null;
+  let insertingBeforeItemId: string | null = null;
   let displayBudget: DisplayBudget = {
     transport: 0,
     stay: 0,
@@ -545,6 +546,31 @@
         ),
       ),
     };
+    recalcBudget();
+    markDirty();
+  }
+
+  function insertItemBefore(
+    dayId: string,
+    beforeItemId: string,
+    type: DayItemType,
+  ) {
+    if (!draft) return;
+    const nextItem = createDayItem(type);
+    draft = {
+      ...draft,
+      days: relabelDays(
+        draft.days.map((day) => {
+          if (day.id !== dayId) return day;
+          const index = day.items.findIndex((item) => item.id === beforeItemId);
+          if (index === -1) return day;
+          const newItems = [...day.items];
+          newItems.splice(index, 0, nextItem);
+          return { ...day, items: newItems };
+        }),
+      ),
+    };
+    insertingBeforeItemId = null;
     recalcBudget();
     markDirty();
   }
@@ -1479,6 +1505,47 @@
               </p>
             {/if}
             {#each day.items as entry, index}
+              {#if insertingBeforeItemId === entry.id}
+                <div
+                  class="mb-4 rounded-2xl border border-sky-300 bg-sky-50 p-4 shadow-sm"
+                >
+                  <div class="flex items-center justify-between mb-3">
+                    <h5 class="text-sm font-semibold text-sky-700">
+                      在这之前插入新项目
+                    </h5>
+                    <button
+                      class="rounded-full bg-white/50 p-1 text-sky-600 hover:bg-white/80 hover:text-sky-700"
+                      on:click={() => (insertingBeforeItemId = null)}
+                      title="取消"
+                    >
+                      <svg
+                        class="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                      >
+                        <path
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                          stroke-width="2"
+                          d="M6 18L18 6M6 6l12 12"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                  <div class="flex flex-wrap gap-2">
+                    {#each DAY_ITEM_OPTIONS as option}
+                      <button
+                        class="rounded-full border border-sky-300 bg-white px-4 py-2 text-xs text-sky-600 hover:bg-sky-100"
+                        on:click={() =>
+                          insertItemBefore(day.id, entry.id, option.value)}
+                      >
+                        {option.label}
+                      </button>
+                    {/each}
+                  </div>
+                </div>
+              {/if}
               <div class="rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div class="flex flex-wrap items-center justify-between gap-2">
                   <div class="flex items-center gap-2 text-xs text-slate-500">
@@ -1489,6 +1556,15 @@
                     <span class="text-slate-500">#{index + 1}</span>
                   </div>
                   <div class="flex items-center gap-2 text-xs">
+                    <button
+                      class="rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:border-sky-300 hover:text-sky-500"
+                      on:click={() => {
+                        insertingBeforeItemId =
+                          insertingBeforeItemId === entry.id ? null : entry.id;
+                      }}
+                    >
+                      上方插入
+                    </button>
                     <button
                       class="rounded-full border border-slate-200 px-3 py-1 text-slate-500 hover:border-sky-300 hover:text-sky-500"
                       on:click={() => moveItem(day.id, entry.id, -1)}
